@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="ProtocoloBrasil — Plataforma de apoio à decisão clínica baseada em PCDTs do Ministério da Saúde e diretrizes brasileiras">
+<meta name="keywords" content="PCDT, SUS, decisão clínica, medicina, protocolo, Ministério da Saúde">
+<meta property="og:title" content="ProtocoloBrasil">
+<meta property="og:description" content="Apoio à decisão clínica com 112 PCDTs do Ministério da Saúde">
+<meta property="og:url" content="https://protocolobrasil.com.br">
+<title>ProtocoloBrasil — Apoio à Decisão Clínica</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="sp-logo">🩺</div>
+  <div class="sp-brand">Protocolo<b>Brasil</b></div>
+  <div class="sp-tagline">Apoio à Decisão Clínica Baseada em Evidências</div>
+  <div class="sp-bar"><div class="sp-fill" id="spf"></div></div>
+  <div class="sp-st" id="spst">Iniciando...</div>
+</div>
+
+<!-- ONBOARDING -->
+<div id="ob">
+<div class="ob-card">
+  <div class="ob-logo">
+    <div class="ob-ic">🩺</div>
+    <div class="ob-name">Protocolo<b>Brasil</b> <span class="ver-tag">v1.0</span></div>
+  </div>
+  <div class="ob-h">Acesso profissional</div>
+  <div class="ob-sub">Decisão clínica baseada em 112 PCDTs do Ministério da Saúde, diretrizes brasileiras e literatura internacional — com banco de dados centralizado e analytics epidemiológico.</div>
+  <div class="ob-live"><div class="pls"></div><span>Banco de dados Supabase ativo — dados sincronizados em tempo real</span></div>
+  <div class="ob-warn">⚠️ <strong>Exclusivo para profissionais de saúde.</strong> Não substitui protocolos originais nem o julgamento clínico. Os dados são anonimizados para fins epidemiológicos.</div>
+  <div class="ob-g">
+    <div class="fld"><label>Nome</label><input id="onome" placeholder="Dr(a). Nome Sobrenome"/></div>
+    <div class="fld"><label>CRM</label><input id="ocrm" placeholder="000000"/></div>
+    <div class="fld"><label>UF</label>
+      <select id="ouf"><option value="">Estado...</option>
+        <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+        <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+        <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+        <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+        <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+        <option>SP</option><option>SE</option><option>TO</option>
+      </select>
+    </div>
+    <div class="fld"><label>Especialidade</label>
+      <select id="oesp"><option value="">Selecione...</option>
+        <option>Clínica Médica</option><option>Cardiologia</option><option>Neurologia</option>
+        <option>Endocrinologia</option><option>Reumatologia</option><option>Oncologia</option>
+        <option>Dermatologia</option><option>Pneumologia</option><option>Gastroenterologia</option>
+        <option>Nefrologia</option><option>Infectologia</option><option>Psiquiatria</option>
+        <option>Pediatria</option><option>Ginecologia e Obstetrícia</option><option>Hematologia</option>
+        <option>Ortopedia</option><option>Medicina de Família</option><option>Geriatria</option>
+        <option>Outra</option>
+      </select>
+    </div>
+  </div>
+  <button class="ob-btn" onclick="entrar()">Acessar ProtocoloBrasil →</button>
+  <p style="font-size:10.5px;color:var(--ink4);text-align:center;margin-top:12px">
+    Ao acessar você concorda com os <a href="#" style="color:var(--teal)">Termos de Uso</a> e a 
+    <a href="#" style="color:var(--teal)">Política de Privacidade</a> (LGPD)
+  </p>
+</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+<header>
+  <div class="h-logo">
+    <div class="h-ic">🩺</div>
+    <span class="h-name">Protocolo<b>Brasil</b></span>
+    <span class="h-badge">112 PCDTs · v1.0</span>
+    <div class="h-live"><div class="pls"></div><span id="hlive">—</span></div>
+  </div>
+  <div class="h-r">
+    <button class="nav-btn on"           onclick="goPage('chat',this)">💬 Consulta</button>
+    <button class="nav-btn"              onclick="goPage('catalog',this)">📚 Catálogo</button>
+    <button class="nav-btn"              onclick="goPage('analytics',this)">📊 Analytics</button>
+    <button class="nav-btn export-nav"   onclick="goPage('export',this)">📥 Exportar</button>
+    <div class="u-pill"><div class="u-av" id="uav">MD</div><span id="ulbl">—</span></div>
+  </div>
+</header>
+
+<div class="body">
+<aside>
+  <div class="s-top">
+    <h4>Minhas Consultas</h4>
+    <div class="s-srch"><span style="color:var(--ink4);font-size:13px">⌕</span>
+      <input placeholder="Buscar..." oninput="filterH(this.value)"/>
+    </div>
+    <button class="new-btn" onclick="newChat()">＋ Nova consulta</button>
+  </div>
+  <div class="h-list" id="hlist"><div style="padding:10px;font-size:11px;color:var(--ink4);text-align:center">Carregando...</div></div>
+  <div class="s-foot">
+    <div class="sync-row">🔄 <span id="sync">Sincronizado</span></div>
+    Dados anonimizados · LGPD<br>Analytics epidemiológico nacional
+  </div>
+</aside>
+
+<!-- CHAT -->
+<div class="page on" id="pg-chat">
+  <div class="filt-row">
+    <div class="fp on"  id="fp-br" onclick="togF('br')">🇧🇷 MS/PCDT</div>
+    <div class="fp g on" id="fp-pc" onclick="togF('pc')">💊 PCDT/SUS</div>
+    <div class="fp b on" id="fp-il" onclick="togF('il')">🌐 Internacional</div>
+    <div class="fp p on" id="fp-ra" onclick="togF('ra')">🧬 Doenças Raras</div>
+  </div>
+  <div class="msgs" id="msgs">
+    <div class="welcome" id="wlc">
+      <div class="wlc-logo">🩺</div>
+      <h2>Olá, <span id="wcn">Doutor(a)</span></h2>
+      <p>Consulte PCDTs, critérios do SUS e diretrizes brasileiras. Banco centralizado Supabase — analytics em tempo real.</p>
+      <div class="db-bar"><div class="pls"></div><span id="dbstat">Conectando ao banco...</span></div>
+      <div class="sugg-g">
+        <div class="sugg" onclick="useS(this)"><div class="sugg-ic">💊</div><div class="sugg-t">PCDT — Artrite Psoriásica 2026</div><div class="sugg-d">Critérios e medicamentos SUS — portaria jan/2026</div></div>
+        <div class="sugg" onclick="useS(this)"><div class="sugg-ic">🧬</div><div class="sugg-t">PCDT — Doença de Fabry</div><div class="sugg-d">Terapia de reposição enzimática e elegibilidade</div></div>
+        <div class="sugg" onclick="useS(this)"><div class="sugg-ic">🫁</div><div class="sugg-t">DPOC — PCDT 2025</div><div class="sugg-d">Escalonamento terapêutico e medicamentos SUS</div></div>
+        <div class="sugg" onclick="useS(this)"><div class="sugg-ic">🧠</div><div class="sugg-t">Esclerose Múltipla — DMTs SUS</div><div class="sugg-d">Moduladores disponíveis no SUS — portaria 2024</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="inp-area">
+    <div class="inp-box">
+      <textarea id="cin" rows="1" placeholder="Caso clínico, diagnóstico, critério PCDT, medicamento SUS..."
+        onkeydown="onK(event)" oninput="aH(this)"></textarea>
+      <button class="send-btn" id="sbtn" onclick="send()">
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+    <div class="inp-hint">112 PCDTs CONITEC/MS · Fontes BR prioritárias · Internacional quando necessário · ⚠️ Não substitui julgamento clínico</div>
+  </div>
+</div>
+
+<!-- CATALOG -->
+<div class="page" id="pg-catalog">
+  <div class="scroll-wrap">
+    <div class="cat-hdr"><h2>Catálogo PCDT</h2><p>112 protocolos ativos — CONITEC/MS até Jan/2026. Clique para consultar.</p></div>
+    <input class="cat-srch" id="catq" placeholder="Buscar por doença ou especialidade..." oninput="filterCat(this.value)"/>
+    <div class="cat-tabs" id="cattabs"></div>
+    <div class="pcdt-grid" id="pcdt-g"></div>
+  </div>
+</div>
+
+<!-- ANALYTICS -->
+<div class="page" id="pg-analytics">
+  <div class="scroll-wrap">
+    <div class="an-hdr">
+      <div class="an-hdr-l"><h2>Painel Analítico</h2><p>Dados centralizados Supabase — todas as consultas da plataforma</p></div>
+      <div class="an-r">
+        <div class="h-live" style="font-size:11px"><div class="pls"></div>Supabase live</div>
+        <button class="ref-btn" onclick="loadAnalytics()">↻ Atualizar</button>
+      </div>
+    </div>
+    <div class="kpi-r">
+      <div class="kpi"><div class="kpi-v" id="kv1">—</div><div class="kpi-l">Consultas totais</div><div class="kpi-d" id="kd1">plataforma</div></div>
+      <div class="kpi"><div class="kpi-v" id="kv2">—</div><div class="kpi-l">Médicos únicos</div><div class="kpi-d">CRMs</div></div>
+      <div class="kpi"><div class="kpi-v" id="kv3">—%</div><div class="kpi-l">PCDT/SUS</div><div class="kpi-d">alto custo</div></div>
+      <div class="kpi"><div class="kpi-v" id="kv4">—%</div><div class="kpi-l">Fontes internacionais</div><div class="kpi-d">lacunas BR</div></div>
+    </div>
+    <div class="an-g">
+      <div class="an-c"><h3>Temas mais consultados</h3><div id="an-top"></div></div>
+      <div class="an-c"><h3>Por especialidade</h3><div id="an-esp"></div></div>
+      <div class="an-c full"><h3>Mapa de calor por UF</h3><div class="map-g" id="an-map"></div></div>
+      <div class="an-c"><h3>Palavras-chave</h3><div class="tags" id="an-tags"></div></div>
+      <div class="an-c"><h3>Tipo de fonte</h3><div id="an-src"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT -->
+<div class="page" id="pg-export">
+  <div class="scroll-wrap">
+    <div class="exp-hdr"><h2>Central de Exportação</h2><p>Relatórios gerados diretamente do banco Supabase</p></div>
+    <div class="filters-card">
+      <h3>Filtros do Relatório</h3>
+      <div class="fg">
+        <div class="fld2"><label>Período</label>
+          <select id="fp"><option value="">Todo o período</option>
+            <option value="1">Hoje</option><option value="7">7 dias</option>
+            <option value="30">30 dias</option><option value="90">90 dias</option>
+          </select>
+        </div>
+        <div class="fld2"><label>Estado (UF)</label>
+          <select id="fuf"><option value="">Todos</option>
+            <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+            <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+            <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+            <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+            <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option><option>SE</option><option>TO</option>
+          </select>
+        </div>
+        <div class="fld2"><label>Especialidade</label>
+          <select id="fesp"><option value="">Todas</option>
+            <option>Clínica Médica</option><option>Cardiologia</option><option>Neurologia</option>
+            <option>Endocrinologia</option><option>Reumatologia</option><option>Oncologia</option>
+            <option>Pneumologia</option><option>Infectologia</option><option>Pediatria</option><option>Hematologia</option>
+          </select>
+        </div>
+        <div class="fld2"><label>Tipo</label>
+          <select id="ftipo"><option value="">Todos</option>
+            <option value="k">PCDT/SUS</option><option value="p">Protocolo</option>
+            <option value="r">Doenças Raras</option><option value="i">Internacional</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+        <button class="apply-btn" onclick="loadExport()">Aplicar Filtros</button>
+        <span id="exp-cnt" style="font-size:12px;color:var(--ink3)"></span>
+      </div>
+    </div>
+    <div class="kpi-r" style="margin-bottom:14px">
+      <div class="kpi"><div class="kpi-v" id="ek1">—</div><div class="kpi-l">Consultas</div></div>
+      <div class="kpi"><div class="kpi-v" id="ek2">—</div><div class="kpi-l">Médicos</div></div>
+      <div class="kpi"><div class="kpi-v" id="ek3">—</div><div class="kpi-l">Estados</div></div>
+      <div class="kpi"><div class="kpi-v" id="ek4">—%</div><div class="kpi-l">PCDT/SUS</div></div>
+    </div>
+    <div class="exp-grid">
+      <div class="exp-card">
+        <div class="ec-hdr"><div class="ec-ic pdf">📄</div>
+          <div class="ec-hdr-t"><h3>Relatório Executivo PDF</h3><p>Para apresentações e investidores</p></div>
+        </div>
+        <div class="ec-feats">
+          <div class="ec-feat">KPIs executivos + sumário</div>
+          <div class="ec-feat">Ranking de temas com barras visuais</div>
+          <div class="ec-feat">Distribuição geográfica por UF</div>
+          <div class="ec-feat">Insights sobre lacunas em protocolos nacionais</div>
+        </div>
+        <button class="exp-btn pdf" id="btn-pdf" onclick="exportPDF()">📥 Baixar PDF Executivo</button>
+      </div>
+      <div class="exp-card">
+        <div class="ec-hdr"><div class="ec-ic xlsx">📊</div>
+          <div class="ec-hdr-t"><h3>Planilha Excel Analítica</h3><p>6 abas com dados completos</p></div>
+        </div>
+        <div class="ec-feats">
+          <div class="ec-feat">Dados brutos + resumo por UF</div>
+          <div class="ec-feat">Ranking de temas + especialidades</div>
+          <div class="ec-feat">Série temporal + resumo executivo</div>
+        </div>
+        <button class="exp-btn xlsx" id="btn-xlsx" onclick="exportXLSX()">📥 Baixar Excel Analítico</button>
+      </div>
+    </div>
+    <div class="prev-card">
+      <h3>Pré-visualização</h3>
+      <div class="ptabs">
+        <div class="ptab on" onclick="showPT('t-raw',this)">Consultas recentes</div>
+        <div class="ptab" onclick="showPT('t-map',this)">Mapa UF</div>
+      </div>
+      <div id="t-raw">
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>#</th><th>Data</th><th>UF</th><th>Especialidade</th><th>Consulta</th><th>Tipo</th></tr></thead>
+          <tbody id="exp-tbl"></tbody>
+        </table></div>
+      </div>
+      <div id="t-map" style="display:none"><div class="map-g" id="exp-map"></div></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /body -->
+</div><!-- /app -->
+<div class="toast" id="toast"></div>
+
+<script src="pcdt-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
