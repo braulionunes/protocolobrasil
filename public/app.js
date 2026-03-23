@@ -299,262 +299,313 @@ async function sendLME() {
 
 function gerarLMEpdf(d) {
   const hoje = new Date().toLocaleDateString('pt-BR');
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
-<meta charset="UTF-8">
-<title>LME — Rascunho ProtocoloBrasil</title>
-<style>
-  @page { size: A4; margin: 10mm 12mm; }
-  @media print { body { margin: 0; } .no-print { display: none; } }
-  body { font-family: Arial, sans-serif; font-size: 9px; color: #000; background: white; }
-  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-35deg); font-size: 52px; color: rgba(180,0,0,0.07); font-weight: 900; pointer-events: none; z-index: 0; white-space: nowrap; }
-  .page { position: relative; z-index: 1; }
-  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-  .sus-logo { font-size: 18px; font-weight: 900; color: #00447a; letter-spacing: -1px; }
-  .header-titles { text-align: center; flex: 1; }
-  .header-titles h1 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; margin: 1px 0; }
-  .header-titles h2 { font-size: 9px; font-weight: 700; text-transform: uppercase; margin: 1px 0; }
-  .header-titles h3 { font-size: 8.5px; font-weight: 700; text-transform: uppercase; margin: 1px 0; }
-  .gov { text-align: right; font-size: 7.5px; line-height: 1.4; }
-  .section-title { background: #000; color: #fff; font-weight: 700; font-size: 8px; text-transform: uppercase; padding: 2px 4px; margin: 3px 0 2px; }
-  table { width: 100%; border-collapse: collapse; }
-  td, th { border: 0.5px solid #666; padding: 2px 4px; vertical-align: top; font-size: 8.5px; }
-  .label { font-size: 7.5px; color: #333; display: block; margin-bottom: 1px; }
-  .value { font-size: 9px; font-weight: 600; min-height: 14px; }
-  .field { border: 0.5px solid #666; padding: 2px 4px; margin-bottom: 2px; }
-  .field-inline { display: flex; gap: 6px; margin-bottom: 2px; }
-  .field-inline .field { flex: 1; }
-  .asterisk { color: red; }
-  .nota { font-size: 7.5px; color: #555; margin: 2px 0; line-height: 1.4; }
-  .checkbox { display: inline-block; width: 8px; height: 8px; border: 0.5px solid #000; margin-right: 3px; vertical-align: middle; }
-  .checkbox.checked { background: #000; }
-  .med-table td { font-size: 8px; padding: 1px 3px; }
-  .rascunho-bar { background: #fff3cd; border: 1px solid #ffc107; padding: 6px 10px; text-align: center; margin-bottom: 4px; font-size: 8.5px; font-weight: 700; color: #856404; }
-  .print-btn { display: block; width: 200px; margin: 8px auto; padding: 8px; background: #004D43; color: white; text-align: center; font-size: 13px; font-weight: 700; cursor: pointer; border: none; border-radius: 6px; }
-  .instrucoes { background: #e8f4f8; border: 1px solid #b8dce8; padding: 6px 10px; margin-bottom: 6px; font-size: 8px; line-height: 1.5; }
-  hr { border: none; border-top: 0.5px solid #999; margin: 2px 0; }
-  .anamnese-box { border: 0.5px solid #666; padding: 3px 4px; min-height: 40px; font-size: 8.5px; line-height: 1.5; white-space: pre-wrap; }
-  .assinatura-box { border: 0.5px solid #666; height: 30px; margin-top: 2px; }
-  .footer-note { font-size: 7px; color: red; text-align: center; margin-top: 3px; }
-</style>
-</head>
-<body>
-<div class="watermark">RASCUNHO</div>
-<div class="page">
 
-<button class="print-btn no-print" onclick="window.print()">🖨️ Baixar / Imprimir PDF</button>
+  // Remove existing LME modal if present
+  const existing = document.getElementById('lme-modal');
+  if (existing) existing.remove();
 
-<div class="rascunho-bar">
-  ⚠️ RASCUNHO GERADO PELO PROTOCOLOBRASIL — Verifique todos os campos antes de assinar e entregar
-</div>
+  // Build modal overlay inside the page — no popup needed
+  const modal = document.createElement('div');
+  modal.id = 'lme-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;';
 
-<div class="instrucoes no-print">
-  <strong>Instruções:</strong> Este é um rascunho para orientação. Campos marcados com <span style="color:red">*</span> são obrigatórios.
-  Preencha os dados do paciente (nome, CNS/CPF, peso, altura) antes de imprimir. Clique em "Baixar / Imprimir PDF" e salve como PDF.
-</div>
+  const tratPrevioSim = d.tratamento_previo && !d.tratamento_previo.toLowerCase().startsWith('n');
 
-<!-- CABEÇALHO -->
-<div class="header-top">
-  <div class="sus-logo">SUS</div>
-  <div class="header-titles">
-    <div style="font-size:7.5px">Sistema Único de Saúde — Ministério da Saúde — Secretaria de Estado da Saúde</div>
-    <h1>Componente Especializado da Assistência Farmacêutica</h1>
-    <h2>Laudo de Solicitação, Avaliação e Autorização de Medicamento(s)</h2>
-    <h3>Solicitação de Medicamento(s)</h3>
-  </div>
-  <div class="gov"></div>
-</div>
-<hr>
+  modal.innerHTML = `
+<div style="background:white;width:min(780px,98%);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);font-family:Arial,sans-serif;font-size:9px;color:#000;position:relative">
 
-<div class="section-title">Campos de Preenchimento Exclusivo pelo Médico Solicitante</div>
-
-<!-- CAMPOS 1 e 2 -->
-<div class="field-inline">
-  <div class="field" style="flex:0.4">
-    <span class="label">1- Número do CNES <span class="asterisk">*</span></span>
-    <div class="value">_______________</div>
-  </div>
-  <div class="field" style="flex:1">
-    <span class="label">2- Nome do estabelecimento de saúde solicitante</span>
-    <div class="value">_______________________________________________</div>
-  </div>
-</div>
-
-<!-- CAMPOS 3, 5, 6 -->
-<div class="field-inline">
-  <div class="field" style="flex:1">
-    <span class="label">3- Nome completo do Paciente <span class="asterisk">*</span></span>
-    <div class="value">_______________________________________________</div>
-  </div>
-  <div class="field" style="flex:0.25">
-    <span class="label">5- Peso <span class="asterisk">*</span></span>
-    <div class="value">_______ kg</div>
-  </div>
-  <div class="field" style="flex:0.25">
-    <span class="label">6- Altura <span class="asterisk">*</span></span>
-    <div class="value">_______ cm</div>
-  </div>
-</div>
-
-<!-- CAMPO 4 -->
-<div class="field">
-  <span class="label">4- Nome da Mãe do Paciente <span class="asterisk">*</span></span>
-  <div class="value">_______________________________________________</div>
-</div>
-
-<!-- CAMPO 7 — MEDICAMENTOS -->
-<div style="margin-bottom:2px">
-  <span class="label"><strong>7- Medicamento(s) <span class="asterisk">*</span></strong></span>
-  <table class="med-table">
-    <thead>
-      <tr style="background:#eee">
-        <th style="width:20px">#</th>
-        <th>Medicamento (nome genérico, dose, forma farmacêutica)</th>
-        <th style="width:30px">1º mês</th>
-        <th style="width:30px">2º mês</th>
-        <th style="width:30px">3º mês</th>
-        <th style="width:30px">4º mês</th>
-        <th style="width:30px">5º mês</th>
-        <th style="width:30px">6º mês</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>1</td><td><strong>${d.medicamento1 || ''}</strong></td><td>${d.qtd_mensal||''}</td><td>${d.qtd_mensal||''}</td><td>${d.qtd_mensal||''}</td><td>${d.qtd_mensal||''}</td><td>${d.qtd_mensal||''}</td><td>${d.qtd_mensal||''}</td></tr>
-      <tr><td>2</td><td>${d.medicamento2||''}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-      <tr><td>3</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-      <tr><td>4</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-      <tr><td>5</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-      <tr><td>6</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    </tbody>
-  </table>
-</div>
-
-<!-- CAMPOS 9 e 10 -->
-<div class="field-inline">
-  <div class="field" style="flex:0.3">
-    <span class="label">9- CID-10 <span class="asterisk">*</span></span>
-    <div class="value"><strong>${d.cid10||'__________'}</strong></div>
-  </div>
-  <div class="field" style="flex:1">
-    <span class="label">10- Diagnóstico</span>
-    <div class="value"><strong>${d.diagnostico||''}</strong></div>
-  </div>
-</div>
-
-<!-- CAMPO 11 — ANAMNESE -->
-<div class="field">
-  <span class="label">11- Anamnese <span class="asterisk">*</span></span>
-  <div class="anamnese-box">${d.anamnese||''}</div>
-</div>
-
-<!-- CAMPO 12 -->
-<div class="field">
-  <span class="label">12- Paciente realizou tratamento prévio ou está em tratamento da doença? <span class="asterisk">*</span></span>
-  <div style="margin-top:2px">
-    <span class="checkbox ${d.tratamento_previo && d.tratamento_previo.toLowerCase().startsWith('n') ? 'checked' : ''}"></span> NÃO &nbsp;&nbsp;
-    <span class="checkbox ${d.tratamento_previo && !d.tratamento_previo.toLowerCase().startsWith('n') ? 'checked' : ''}"></span> SIM. Relatar: <strong>${d.tratamento_previo && !d.tratamento_previo.toLowerCase().startsWith('n') ? d.tratamento_previo : ''}</strong>
-  </div>
-</div>
-
-<!-- CAMPO 13 -->
-<div class="field">
-  <span class="label"><strong>13- Atestado de capacidade <span class="asterisk">*</span></strong></span>
-  <div class="nota">A solicitação do medicamento deverá ser realizada pelo paciente. O paciente é considerado incapaz?</div>
-  <span class="checkbox"></span> NÃO &nbsp;&nbsp; <span class="checkbox"></span> SIM. Nome do responsável: ___________________________
-</div>
-
-<!-- CAMPOS 14, 15, 16, 17 -->
-<div class="field-inline">
-  <div class="field" style="flex:1">
-    <span class="label">14- Nome do médico solicitante <span class="asterisk">*</span></span>
-    <div class="value">_______________________________________________</div>
-  </div>
-  <div class="field" style="flex:0.5">
-    <span class="label">15- CNS do médico <span class="asterisk">*</span></span>
-    <div class="value">_______________</div>
-  </div>
-  <div class="field" style="flex:0.3">
-    <span class="label">16- Data <span class="asterisk">*</span></span>
-    <div class="value">${hoje}</div>
-  </div>
-</div>
-<div class="field">
-  <span class="label">17- Assinatura e carimbo do médico <span class="asterisk">*</span></span>
-  <div class="assinatura-box"></div>
-</div>
-
-<!-- CAMPO 18 -->
-<div class="field">
-  <span class="label"><strong>18- Campos abaixo preenchidos por <span class="asterisk">*</span>:</strong></span>
-  <div style="margin-top:2px">
-    <span class="checkbox"></span> Paciente &nbsp;
-    <span class="checkbox"></span> Mãe do paciente &nbsp;
-    <span class="checkbox"></span> Responsável &nbsp;
-    <span class="checkbox"></span> Médico solicitante
-  </div>
-</div>
-
-<!-- CAMPOS 19, 20, 21, 22, 23 -->
-<div class="field-inline">
-  <div class="field" style="flex:1">
-    <span class="label">19- Raça/Cor/Etnia <span class="asterisk">*</span></span>
-    <div style="margin-top:2px;font-size:8px">
-      <span class="checkbox"></span> Branca &nbsp;
-      <span class="checkbox"></span> Preta &nbsp;
-      <span class="checkbox"></span> Parda &nbsp;
-      <span class="checkbox"></span> Amarela &nbsp;
-      <span class="checkbox"></span> Indígena
+  <!-- TOOLBAR -->
+  <div style="background:#004D43;color:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-family:'Plus Jakarta Sans',sans-serif;">
+    <div style="font-size:13px;font-weight:700">📋 Rascunho do LME — ProtocoloBrasil</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="imprimirLME()" style="padding:6px 14px;background:#18C4B0;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+      <button onclick="document.getElementById('lme-modal').remove()" style="padding:6px 14px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">✕ Fechar</button>
     </div>
   </div>
-  <div class="field" style="flex:0.6">
-    <span class="label">20- Telefone(s) para contato</span>
-    <div class="value">_______________</div>
+
+  <!-- AVISO RASCUNHO -->
+  <div style="background:#fff3cd;border-bottom:1px solid #ffc107;padding:7px 14px;font-size:11px;color:#856404;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;">
+    ⚠️ RASCUNHO — Preencha os campos em amarelo antes de imprimir e assinar
   </div>
-</div>
-<div class="field-inline">
-  <div class="field" style="flex:0.6">
-    <span class="label">21- Número do documento do paciente</span>
-    <div style="font-size:8px;margin-top:2px"><span class="checkbox"></span> CPF &nbsp; <span class="checkbox"></span> CNS &nbsp; _______________</div>
-  </div>
-  <div class="field" style="flex:1">
-    <span class="label">22- Correio eletrônico do paciente</span>
-    <div class="value">___________________________</div>
-  </div>
-  <div class="field" style="flex:0.6">
-    <span class="label">23- Assinatura do responsável <span class="asterisk">*</span></span>
-    <div class="assinatura-box" style="height:20px"></div>
-  </div>
-</div>
 
-<div style="font-size:7.5px;text-align:center;margin-top:2px;color:#555">* CAMPOS DE PREENCHIMENTO OBRIGATÓRIO</div>
-<div class="footer-note">Para suporte, entre em contato pelo: ceaf.daf@saude.gov.br</div>
+  <!-- FORMULÁRIO LME -->
+  <div id="lme-form" style="padding:10px 14px;">
 
-${d.documentos ? `
-<div style="margin-top:6px;border:0.5px solid #0047ab;border-radius:3px;padding:4px 6px;background:#f0f4ff">
-  <div style="font-size:8px;font-weight:700;color:#0047ab;margin-bottom:3px">📋 DOCUMENTOS OBRIGATÓRIOS A ANEXAR (conforme PCDT)</div>
-  <div style="font-size:8px;line-height:1.6">${d.documentos.split(';').map(doc => `• ${doc.trim()}`).join('<br>')}</div>
-</div>` : ''}
+    <!-- CABEÇALHO OFICIAL -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:3px">
+      <tr>
+        <td style="width:60px;border:none;padding:2px;vertical-align:middle">
+          <div style="background:#1351B4;color:white;font-size:14px;font-weight:900;padding:4px 6px;letter-spacing:-1px">SUS</div>
+        </td>
+        <td style="border:none;text-align:center;vertical-align:middle">
+          <div style="font-size:7.5px;color:#333">Sistema Único de Saúde — Ministério da Saúde — Secretaria de Estado da Saúde</div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase">Componente Especializado da Assistência Farmacêutica</div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase">Laudo de Solicitação, Avaliação e Autorização de Medicamento(s)</div>
+          <div style="font-size:8.5px;font-weight:700;text-transform:uppercase">Solicitação de Medicamento(s)</div>
+        </td>
+      </tr>
+    </table>
+    <div style="background:#000;color:white;font-size:8px;font-weight:700;padding:2px 5px;text-transform:uppercase;margin-bottom:3px">Campos de Preenchimento Exclusivo pelo Médico Solicitante</div>
 
-${d.observacoes ? `
-<div style="margin-top:4px;border:0.5px solid #006B5E;border-radius:3px;padding:4px 6px;background:#f0faf8">
-  <div style="font-size:8px;font-weight:700;color:#006B5E;margin-bottom:2px">✓ CRITÉRIOS DO PCDT ATENDIDOS</div>
-  <div style="font-size:8px;line-height:1.6">${d.observacoes}</div>
-</div>` : ''}
+    <!-- CAMPOS 1 e 2 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px;width:28%">
+          <div style="font-size:7.5px;color:#555">1- Número do CNES <span style="color:red">*</span></div>
+          <input contenteditable="true" style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="Digite o CNES">
+        </td>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555">2- Nome do estabelecimento de saúde solicitante</div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="Nome do estabelecimento">
+        </td>
+      </tr>
+    </table>
 
-<div style="margin-top:4px;background:#fff3cd;border:0.5px solid #ffc107;border-radius:3px;padding:4px 6px;font-size:7.5px;color:#856404">
-  <strong>RASCUNHO ProtocoloBrasil</strong> — Gerado em ${hoje} — Verifique todos os dados antes de assinar. Campos em branco devem ser preenchidos pelo médico.
-</div>
+    <!-- CAMPOS 3, 5, 6 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555">3- Nome completo do Paciente <span style="color:red">*</span></div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="Nome completo do paciente">
+        </td>
+        <td style="border:1px solid #666;padding:3px 5px;width:15%">
+          <div style="font-size:7.5px;color:#555">5- Peso <span style="color:red">*</span></div>
+          <input style="width:80%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="00"> kg
+        </td>
+        <td style="border:1px solid #666;padding:3px 5px;width:15%">
+          <div style="font-size:7.5px;color:#555">6- Altura <span style="color:red">*</span></div>
+          <input style="width:80%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="000"> cm
+        </td>
+      </tr>
+    </table>
 
-</div>
-</body></html>`;
+    <!-- CAMPO 4 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555">4- Nome da Mãe do Paciente <span style="color:red">*</span></div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="Nome da mãe do paciente">
+        </td>
+      </tr>
+    </table>
 
-  // Open in new window for printing
-  const win = window.open('', '_blank', 'width=900,height=700');
-  win.document.write(html);
-  win.document.close();
+    <!-- CAMPO 7 — MEDICAMENTOS -->
+    <div style="font-size:8px;font-weight:700;margin-bottom:1px">7- Medicamento(s) <span style="color:red">*</span> &nbsp; <span style="font-size:7.5px;font-weight:400;color:#555">8- Quantidade solicitada</span></div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px;font-size:8px">
+      <thead>
+        <tr style="background:#e8e8e8">
+          <th style="border:1px solid #666;padding:2px 4px;width:20px">#</th>
+          <th style="border:1px solid #666;padding:2px 4px">Medicamento (nome genérico, dose, forma farmacêutica)</th>
+          <th style="border:1px solid #666;padding:2px 3px;width:38px">1º mês</th>
+          <th style="border:1px solid #666;padding:2px 3px;width:38px">2º mês</th>
+          <th style="border:1px solid #666;padding:2px 3px;width:38px">3º mês</th>
+          <th style="border:1px solid #666;padding:2px 3px;width:38px">4º mês</th>
+          <th style="border:1px solid #666;padding:2px 3px;width:38px">5º mês</th>
+          <th style="border:1px solid #666;padding:2px 3px;width:38px">6º mês</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="border:1px solid #666;padding:2px 4px;text-align:center">1</td>
+          <td style="border:1px solid #666;padding:1px 4px"><input style="width:100%;border:none;font-size:8.5px;font-weight:600;background:transparent;outline:none" value="${d.medicamento1||''}"></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value="${d.qtd_mensal||''}"></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value="${d.qtd_mensal||''}"></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value="${d.qtd_mensal||''}"></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value="${d.qtd_mensal||''}"></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value="${d.qtd_mensal||''}"></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value="${d.qtd_mensal||''}"></td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #666;padding:2px 4px;text-align:center">2</td>
+          <td style="border:1px solid #666;padding:1px 4px"><input style="width:100%;border:none;font-size:8.5px;background:transparent;outline:none" value="${d.medicamento2||''}"></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value=""></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value=""></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value=""></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value=""></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value=""></td>
+          <td style="border:1px solid #666;padding:1px 3px"><input style="width:100%;border:none;font-size:8px;text-align:center;background:transparent;outline:none" value=""></td>
+        </tr>
+        ${[3,4,5,6].map(n=>`<tr><td style="border:1px solid #666;padding:2px 4px;text-align:center">${n}</td>${Array(7).fill('<td style="border:1px solid #666;padding:1px 4px"><input style="width:100%;border:none;font-size:8px;background:transparent;outline:none" value=""></td>').join('')}</tr>`).join('')}
+      </tbody>
+    </table>
+
+    <!-- CAMPOS 9 e 10 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px;width:20%">
+          <div style="font-size:7.5px;color:#555">9- CID-10 <span style="color:red">*</span></div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;font-size:9px;font-weight:700;padding:1px;outline:none;background:transparent" value="${d.cid10||''}">
+        </td>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555">10- Diagnóstico</div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;font-size:9px;font-weight:600;padding:1px;outline:none;background:transparent" value="${d.diagnostico||''}">
+        </td>
+      </tr>
+    </table>
+
+    <!-- CAMPO 11 — ANAMNESE -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555;margin-bottom:2px">11- Anamnese <span style="color:red">*</span></div>
+          <textarea style="width:100%;border:none;font-size:8.5px;line-height:1.5;resize:vertical;min-height:60px;outline:none;background:transparent;font-family:Arial">${d.anamnese||''}</textarea>
+        </td>
+      </tr>
+    </table>
+
+    <!-- CAMPO 12 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555;margin-bottom:2px">12- Paciente realizou tratamento prévio ou está em tratamento da doença? <span style="color:red">*</span></div>
+          <label style="margin-right:12px;font-size:8.5px"><input type="radio" name="trat_previo" ${!tratPrevioSim?'checked':''}> NÃO</label>
+          <label style="font-size:8.5px"><input type="radio" name="trat_previo" ${tratPrevioSim?'checked':''}> SIM. Relatar:</label>
+          <textarea style="width:100%;border:none;border-bottom:1px solid #aaa;font-size:8.5px;resize:vertical;min-height:24px;outline:none;background:transparent;font-family:Arial;margin-top:2px">${tratPrevioSim?d.tratamento_previo:''}</textarea>
+        </td>
+      </tr>
+    </table>
+
+    <!-- CAMPO 13 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:8px;font-weight:700;margin-bottom:2px">13- Atestado de capacidade <span style="color:red">*</span></div>
+          <div style="font-size:7.5px;color:#444;margin-bottom:3px">A solicitação do medicamento deverá ser realizada pelo paciente. O paciente é considerado incapaz?</div>
+          <label style="margin-right:12px;font-size:8.5px"><input type="radio" name="incapaz" checked> NÃO</label>
+          <label style="font-size:8.5px"><input type="radio" name="incapaz"> SIM. Nome do responsável: <input style="border:none;border-bottom:1px solid #aaa;font-size:8.5px;width:180px;outline:none;background:#fffde7" placeholder="Nome do responsável"></label>
+        </td>
+      </tr>
+    </table>
+
+    <!-- CAMPOS 14, 15, 16 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555">14- Nome do médico solicitante <span style="color:red">*</span></div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="Nome do médico">
+        </td>
+        <td style="border:1px solid #666;padding:3px 5px;width:30%">
+          <div style="font-size:7.5px;color:#555">15- CNS do médico solicitante <span style="color:red">*</span></div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="Número CNS">
+        </td>
+        <td style="border:1px solid #666;padding:3px 5px;width:20%">
+          <div style="font-size:7.5px;color:#555">16- Data da solicitação <span style="color:red">*</span></div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;font-size:9px;padding:1px;outline:none;background:transparent" value="${hoje}">
+        </td>
+      </tr>
+    </table>
+
+    <!-- CAMPO 17 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px;height:40px">
+          <div style="font-size:7.5px;color:#555">17- Assinatura e carimbo do médico <span style="color:red">*</span></div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- CAMPO 18 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:8px;font-weight:700;margin-bottom:2px">18- Campos abaixo preenchidos por <span style="color:red">*</span>:</div>
+          <label style="margin-right:10px;font-size:8.5px"><input type="checkbox"> Paciente</label>
+          <label style="margin-right:10px;font-size:8.5px"><input type="checkbox"> Mãe do paciente</label>
+          <label style="margin-right:10px;font-size:8.5px"><input type="checkbox"> Responsável (descrito no item 13)</label>
+          <label style="font-size:8.5px"><input type="checkbox"> Médico solicitante</label>
+          <div style="margin-top:3px;font-size:8px">Outro, informar nome: <input style="border:none;border-bottom:1px solid #aaa;width:160px;outline:none;background:#fffde7;font-size:8px" placeholder="Nome"> e CPF <input style="border:none;border-bottom:1px solid #aaa;width:100px;outline:none;background:#fffde7;font-size:8px" placeholder="CPF"></div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- CAMPOS 19, 20, 21, 22, 23 -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px;width:40%">
+          <div style="font-size:7.5px;color:#555;margin-bottom:2px">19- Raça/Cor/Etnia <span style="color:red">*</span></div>
+          <label style="margin-right:8px;font-size:8px"><input type="checkbox"> Branca</label>
+          <label style="margin-right:8px;font-size:8px"><input type="checkbox"> Preta</label>
+          <label style="margin-right:8px;font-size:8px"><input type="checkbox"> Parda</label>
+          <label style="margin-right:8px;font-size:8px"><input type="checkbox"> Amarela</label>
+          <label style="font-size:8px"><input type="checkbox"> Indígena. Etnia: <input style="border:none;border-bottom:1px solid #aaa;width:80px;outline:none;font-size:8px;background:#fffde7"></label>
+        </td>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555">20- Telefone(s) para contato do paciente</div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="Telefone">
+        </td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555;margin-bottom:2px">21- Número do documento do paciente</div>
+          <label style="margin-right:8px;font-size:8px"><input type="checkbox"> CPF</label>
+          <label style="margin-right:8px;font-size:8px"><input type="checkbox"> CNS</label>
+          <input style="border:none;border-bottom:1px solid #aaa;width:120px;outline:none;background:#fffde7;font-size:9px" placeholder="Número">
+        </td>
+        <td style="border:1px solid #666;padding:3px 5px">
+          <div style="font-size:7.5px;color:#555">22- Correio eletrônico do paciente</div>
+          <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9px;padding:1px;outline:none" placeholder="E-mail do paciente">
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="border:1px solid #666;padding:3px 5px;height:30px">
+          <div style="font-size:7.5px;color:#555">23- Assinatura do responsável pelo preenchimento <span style="color:red">*</span></div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="font-size:7.5px;text-align:center;margin:2px 0;color:#333">* CAMPOS DE PREENCHIMENTO OBRIGATÓRIO</div>
+    <div style="font-size:7.5px;text-align:center;color:red">Para suporte, entre em contato pelo: ceaf.daf@saude.gov.br</div>
+
+    ${d.documentos ? `
+    <div style="margin-top:6px;border:1px solid #1351B4;border-radius:4px;padding:5px 8px;background:#f0f4ff">
+      <div style="font-size:8.5px;font-weight:700;color:#1351B4;margin-bottom:3px">📋 DOCUMENTOS OBRIGATÓRIOS A ANEXAR (conforme PCDT)</div>
+      <div style="font-size:8.5px;line-height:1.7">${d.documentos.split(';').map(doc => doc.trim() ? '• ' + doc.trim() : '').filter(Boolean).join('<br>')}</div>
+    </div>` : ''}
+
+    ${d.observacoes ? `
+    <div style="margin-top:4px;border:1px solid #006B5E;border-radius:4px;padding:5px 8px;background:#f0faf8">
+      <div style="font-size:8.5px;font-weight:700;color:#006B5E;margin-bottom:2px">✓ CRITÉRIOS DO PCDT ATENDIDOS PELO PACIENTE</div>
+      <div style="font-size:8.5px;line-height:1.6">${d.observacoes}</div>
+    </div>` : ''}
+
+    <div style="margin-top:6px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:5px 8px;font-size:8px;color:#856404;font-family:'Plus Jakarta Sans',sans-serif">
+      <strong>RASCUNHO ProtocoloBrasil</strong> — Gerado em ${hoje} — Campos em amarelo devem ser preenchidos pelo médico. Verifique todos os dados antes de assinar e entregar ao paciente.
+    </div>
+
+  </div><!-- /lme-form -->
+</div>`;
+
+  document.body.appendChild(modal);
 
   // Show confirmation in chat
-  addAI('✅ **Rascunho do LME gerado!** Uma nova janela foi aberta com o formulário preenchido. Clique em **"🖨️ Baixar / Imprimir PDF"** na janela para salvar como PDF.\n\n⚠️ Preencha os campos em branco (nome do paciente, peso, altura, CNES, CNS do médico) antes de imprimir.');
+  addAI('✅ **Rascunho do LME gerado!** O formulário apareceu na tela. Preencha os campos em amarelo, assine e entregue ao paciente.\\n\\n📋 Campos pré-preenchidos: CID-10, diagnóstico, medicamento, anamnese e critérios do PCDT.\\n⚠️ Campos que precisam ser completados: nome do paciente, peso, altura, CNES, CNS do médico e assinatura.');
 }
+
+function imprimirLME() {
+  const form = document.getElementById('lme-form');
+  if (!form) return;
+  const w = window.open('', '_blank');
+  if (!w) {
+    // Fallback if popup blocked — use print directly
+    const orig = document.body.innerHTML;
+    const toolbar = document.querySelector('#lme-modal > div > div:first-child');
+    const aviso = document.querySelector('#lme-modal > div > div:nth-child(2)');
+    if (toolbar) toolbar.style.display = 'none';
+    if (aviso) aviso.style.display = 'none';
+    window.print();
+    if (toolbar) toolbar.style.display = '';
+    if (aviso) aviso.style.display = '';
+    return;
+  }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>LME</title>
+    <style>@page{size:A4;margin:10mm 12mm;}body{font-family:Arial,sans-serif;margin:0;padding:0;}
+    input,textarea{border:none;border-bottom:1px solid #aaa;outline:none;font-family:Arial;font-size:inherit;}
+    @media print{.no-print{display:none;}}</style></head>
+    <body>${form.innerHTML}<script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
+  w.document.close();
+}
+
+
 function askCriteria() {
   document.getElementById('cin').value = `Detalhe os critérios específicos de cada medicamento disponível no SUS para esta condição — para qual perfil de paciente cada um está indicado, contraindicações específicas e exames necessários antes de iniciar cada um.`;
   send();
