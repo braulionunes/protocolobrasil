@@ -65,10 +65,12 @@ function entrar() {
   document.getElementById('ulbl').textContent = `CRM-${u} ${c}`;
   document.getElementById('wcn').textContent  = n.replace(/^Dr[a]?\.?\s*/i, '').split(' ')[0];
   document.getElementById('ob').classList.remove('show');
-  // Carrega histórico pessoal do localStorage
   myHist = lsGet(`pb_hist_${c}`) || [];
   renderH(myHist);
   renderCat();
+  // Atualiza sugestões da tela inicial com base na especialidade
+  const mainSugg = document.getElementById('main-sugg-g');
+  if (mainSugg) mainSugg.innerHTML = getSugestoes();
   toast('Bem-vindo(a) ao ProtocoloBrasil!', 'ok');
 }
 function gi(id) { return (document.getElementById(id)?.value || '').trim(); }
@@ -214,8 +216,44 @@ function addU(txt, sc = true) {
 function addAI(txt, sc = true) {
   const cm = document.getElementById('msgs');
   const r  = document.createElement('div'); r.className = 'm-row ai';
-  r.innerHTML = `<div class="m-av ai">🩺</div><div class="m-bub">${mdR(txt)}</div>`;
+
+  // Detecta se a resposta envolve PCDT/alto custo para oferecer LME
+  const isPCDT = /crit[eé]rios|LME|componente|CEAF|portaria|medicamento|SUS|dispensação/i.test(txt);
+  const lmeBtn = isPCDT ? `
+    <div class="followup-bar">
+      <button class="followup-btn" onclick="askLME()">📝 Gerar rascunho do LME</button>
+      <button class="followup-btn" onclick="askCriteria()">🔍 Detalhar critérios por medicamento</button>
+      <button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button>
+    </div>` : `
+    <div class="followup-bar">
+      <button class="followup-btn" onclick="askFollowup()">💬 Aprofundar esse tema</button>
+      <button class="followup-btn" onclick="askAlternative()">🔄 Ver protocolo completo</button>
+    </div>`;
+
+  r.innerHTML = `<div class="m-av ai">🩺</div><div class="m-bub">${mdR(txt)}${lmeBtn}</div>`;
   cm.appendChild(r); if (sc) cm.scrollTop = cm.scrollHeight;
+}
+
+function askLME() {
+  const lastQ = conv.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+  document.getElementById('cin').value = `Com base na consulta anterior, gere um rascunho completo do LME (Laudo para Solicitação, Avaliação e Autorização de Medicamentos do Componente Especializado) para este caso, listando campo a campo o que deve ser preenchido, quais documentos anexar e onde entregar.`;
+  send();
+}
+function askCriteria() {
+  document.getElementById('cin').value = `Detalhe os critérios específicos de cada medicamento disponível no SUS para esta condição — para qual perfil de paciente cada um está indicado, contraindicações específicas e exames necessários antes de iniciar cada um.`;
+  send();
+}
+function askDocs() {
+  document.getElementById('cin').value = `Liste todos os documentos e exames obrigatórios que precisam ser anexados ao LME para esta solicitação, incluindo validade dos exames e onde obter os formulários.`;
+  send();
+}
+function askFollowup() {
+  document.getElementById('cin').value = `Aprofunde mais sobre este tema com informações adicionais relevantes para a prática clínica.`;
+  send();
+}
+function askAlternative() {
+  document.getElementById('cin').value = `Mostre o protocolo completo do Ministério da Saúde para esta condição, incluindo fluxograma de diagnóstico e tratamento.`;
+  send();
 }
 function showTyp() {
   const cm = document.getElementById('msgs');
@@ -379,17 +417,122 @@ async function send() {
   busy = false; document.getElementById('sbtn').disabled = false;
 }
 
+// ── SUGESTÕES POR ESPECIALIDADE ──
+const SUGG_BY_ESP = {
+  'Cardiologia': [
+    {ic:'🫀',t:'PCDT — Insuficiência Cardíaca',d:'Sacubitril/valsartana e dapagliflozina: critérios SUS'},
+    {ic:'💊',t:'PCDT — Dislipidemia',d:'Evolocumabe: critérios para alto risco cardiovascular'},
+    {ic:'🩺',t:'Amiloidose por Transtirretina 2025',d:'Tafamidis e patisirana: critérios CEAF'},
+    {ic:'⚡',t:'Fibrilação Atrial',d:'Anticoagulantes disponíveis no SUS e fluxograma'},
+  ],
+  'Reumatologia': [
+    {ic:'💊',t:'PCDT — Artrite Reumatoide',d:'Biológicos e JAK inibidores: critérios de escolha'},
+    {ic:'🦴',t:'PCDT — Artrite Psoriásica 2026',d:'Secuquinumabe, ixequizumabe: quando indicar'},
+    {ic:'🧬',t:'PCDT — Lúpus Eritematoso',d:'Belimumabe e anifrolumabe: critérios CEAF'},
+    {ic:'💉',t:'PCDT — Espondilite Anquilosante',d:'Biológicos no SUS e critérios BASDAI'},
+  ],
+  'Neurologia': [
+    {ic:'🧠',t:'PCDT — Esclerose Múltipla',d:'DMTs: critérios de escolha por perfil do paciente'},
+    {ic:'💊',t:'PCDT — Atrofia Muscular Espinhal',d:'Nusinersena, risdiplam e gene therapy: elegibilidade'},
+    {ic:'⚡',t:'PCDT — Epilepsia',d:'Canabidiol e antiepilépticos de 2ª linha no SUS'},
+    {ic:'🧬',t:'PCDT — Miastenia Gravis',d:'Eculizumabe: critérios para forma refratária'},
+  ],
+  'Pneumologia': [
+    {ic:'🫁',t:'PCDT — DPOC 2025',d:'Terapia tripla e escalonamento: critérios por paciente'},
+    {ic:'💨',t:'PCDT — Asma Grave',d:'Omalizumabe, dupilumabe, mepolizumabe: qual biológico?'},
+    {ic:'🧬',t:'PCDT — Fibrose Cística',d:'Moduladores CFTR: elegibilidade por genótipo'},
+    {ic:'❤️',t:'PCDT — Hipertensão Pulmonar',d:'Macitentana, selexipague: critérios'},
+  ],
+  'Gastroenterologia': [
+    {ic:'🩺',t:'PCDT — Doença de Crohn',d:'Biológicos e pequenas moléculas: critérios de escolha'},
+    {ic:'💊',t:'PCDT — Retocolite Ulcerativa',d:'Vedolizumabe, ustecinumabe, tofacitinibe: quando usar'},
+    {ic:'🧬',t:'PCDT — Hepatite C',d:'Antivirais por genótipo disponíveis no SUS'},
+    {ic:'🫀',t:'PCDT — Doença de Wilson',d:'Critérios diagnósticos e terapêuticos'},
+  ],
+  'Endocrinologia': [
+    {ic:'💉',t:'PCDT — Diabetes Tipo 2',d:'Empagliflozina e semaglutida: critérios para alto risco CV'},
+    {ic:'🧬',t:'PCDT — Acromegalia 2025',d:'Octreotida LAR, pasireotida, pegvisomanto: quando usar'},
+    {ic:'📏',t:'PCDT — Deficiência de GH',d:'Somatropina: critérios diagnósticos e de prescrição'},
+    {ic:'💊',t:'PCDT — Puberdade Precoce Central',d:'Análogos de GnRH: elegibilidade e critérios'},
+  ],
+  'Oncologia': [
+    {ic:'🎗️',t:'DDT — Carcinoma de Mama',d:'Trastuzumabe, palbociclibe, olaparibe: indicações'},
+    {ic:'💊',t:'DDT — Adenocarcinoma de Próstata',d:'Enzalutamida, abiraterona: critérios mCRPC'},
+    {ic:'🧬',t:'DDT — Carcinoma Colorretal',d:'Bevacizumabe, cetuximabe: critérios por status RAS'},
+    {ic:'💉',t:'DDT — Leucemia Linfoide Aguda',d:'Blinatumomabe, iTK: critérios por perfil molecular'},
+  ],
+  'Infectologia': [
+    {ic:'🦠',t:'PCDT HIV — TARV 2023',d:'TDF+3TC+DTG: esquemas, resistência e situações especiais'},
+    {ic:'🫁',t:'Manual TB — MS 2024',d:'Esquemas RIPE, TB-MDR: fluxograma diagnóstico e tratamento'},
+    {ic:'🩸',t:'Manual Dengue — MS',d:'Fluxograma de classificação e conduta por grupo de risco'},
+    {ic:'💊',t:'PCDT — Hepatite B 2023',d:'Tenofovir, entecavir: critérios de início'},
+  ],
+  'Dermatologia': [
+    {ic:'🧴',t:'PCDT — Psoríase',d:'Biológicos IL-17, IL-23, TNF: critérios de escolha por perfil'},
+    {ic:'💊',t:'PCDT — Hidradenite Supurativa',d:'Adalimumabe, secuquinumabe: critérios Hurley II/III'},
+    {ic:'🩺',t:'Hanseníase — Manual MS',d:'Fluxograma diagnóstico e esquemas PQT no SUS'},
+    {ic:'🧬',t:'Psoríase Ungueal / Artropática',d:'Quando escalar para biológico'},
+  ],
+  'Hematologia': [
+    {ic:'🩸',t:'PCDT — Anemia Falciforme 2024',d:'Voxelotor, crizanlizumabe: critérios de escolha'},
+    {ic:'💊',t:'PCDT — Hemofilia',d:'Emicizumabe para pacientes com inibidor: critérios'},
+    {ic:'🧬',t:'PCDT — Mieloma Múltiplo',d:'Daratumumabe, bortezomibe, lenalidomida: protocolos'},
+    {ic:'💉',t:'PCDT — PTI Crônica',d:'Romiplostim, eltrombopague: agonistas de TPO'},
+  ],
+  'Nefrologia': [
+    {ic:'🫘',t:'PCDT — Doença Renal Crônica',d:'Dapagliflozina, eritropoetina: critérios por estágio'},
+    {ic:'💊',t:'PCDT — Síndrome Nefrótica',d:'Rituximabe: critérios para forma refratária'},
+    {ic:'🩺',t:'Diretrizes KDIGO — DRC',d:'Metas terapêuticas e escalonamento no Brasil'},
+    {ic:'🧬',t:'Transplante Renal — imunossupressão',d:'Tacrolimus, micofenolato: protocolos SUS'},
+  ],
+  'Pediatria': [
+    {ic:'🧬',t:'PCDT — AME Pediátrica',d:'Risdiplam, nusinersena: critérios por tipo e idade'},
+    {ic:'💊',t:'PCDT — AIJ',d:'Biológicos pediátricos: canacinumabe, tocilizumabe'},
+    {ic:'📋',t:'Manual HIV Pediátrico — MS 2023',d:'TARV em crianças: fluxograma MS'},
+    {ic:'🫁',t:'PCDT — Fibrose Cística Pediátrica',d:'Moduladores CFTR por genótipo e idade'},
+  ],
+  'Psiquiatria': [
+    {ic:'🧠',t:'PCDT — Esquizofrenia Refratária',d:'Clozapina: critérios e monitorização obrigatória'},
+    {ic:'💊',t:'Palmitato de Paliperidona IM',d:'Injetável de longa duração: critérios SUS'},
+    {ic:'🩺',t:'PCDT — Transtorno Bipolar',d:'Lítio, valproato, quetiapina: escalonamento'},
+    {ic:'📋',t:'Manual Saúde Mental — MS',d:'Fluxograma RAPS e rede de atenção psicossocial'},
+  ],
+  'Ginecologia e Obstetrícia': [
+    {ic:'💊',t:'PCDT — Endometriose',d:'Dienogeste, análogos de GnRH: critérios de escolha'},
+    {ic:'🧬',t:'PCDT — SOP',d:'Metformina, ACO, clomifeno: abordagem por fenótipo'},
+    {ic:'🦠',t:'Manual IST — MS 2022',d:'Fluxograma diagnóstico e tratamento das ISTs'},
+    {ic:'🩺',t:'Pré-natal de Alto Risco',d:'Fluxograma MS para gestantes de risco'},
+  ],
+  'Medicina de Família': [
+    {ic:'🩺',t:'Manual Dengue — MS',d:'Classificação de risco e conduta na APS'},
+    {ic:'💊',t:'PCDT — Hipertensão Arterial',d:'Escalonamento terapêutico no SUS'},
+    {ic:'🧬',t:'Manual Tuberculose — MS 2024',d:'Diagnóstico e tratamento na atenção básica'},
+    {ic:'🫀',t:'PCDT — Diabetes Tipo 2',d:'Metformina, glibenclamida: critérios e metas'},
+  ],
+  'Clínica Médica': [
+    {ic:'💊',t:'PCDT — Dor Crônica 2024',d:'Morfina, pregabalina: critérios de escalonamento'},
+    {ic:'🫀',t:'PCDT — Insuficiência Cardíaca',d:'Sacubitril/valsartana e dapagliflozina: critérios SUS'},
+    {ic:'🦠',t:'Manual Dengue — MS',d:'Classificação de risco e fluxograma de conduta'},
+    {ic:'🧬',t:'PCDT HIV — TARV 2023',d:'Esquemas, resistência e situações especiais'},
+  ],
+};
+const DEFAULT_SUGG = [
+  {ic:'💊',t:'PCDT — Artrite Psoriásica 2026',d:'Critérios e medicamentos SUS — portaria 2026'},
+  {ic:'🧬',t:'PCDT — Doença de Fabry',d:'Terapia de reposição enzimática e elegibilidade'},
+  {ic:'🫁',t:'DPOC — PCDT 2025',d:'Escalonamento terapêutico e medicamentos SUS'},
+  {ic:'🧠',t:'Esclerose Múltipla — DMTs SUS',d:'Moduladores disponíveis no SUS — portaria 2024'},
+];
+function getSugestoes() {
+  const s = SUGG_BY_ESP[user.esp] || DEFAULT_SUGG;
+  return s.map(x => `<div class="sugg" onclick="useS(this)"><div class="sugg-ic">${x.ic}</div><div class="sugg-t">${x.t}</div><div class="sugg-d">${x.d}</div></div>`).join('');
+}
+
 function newChat() {
   conv = [];
   document.getElementById('msgs').innerHTML = `<div class="welcome" id="wlc">
     <div class="wlc-logo">🩺</div><h2>Nova consulta</h2>
     <p>Descreva o caso clínico ou faça sua pergunta sobre PCDTs e medicamentos do SUS.</p>
-    <div class="sugg-g">
-      <div class="sugg" onclick="useS(this)"><div class="sugg-ic">💊</div><div class="sugg-t">PCDT — Artrite Psoriásica 2026</div><div class="sugg-d">Critérios e medicamentos SUS — portaria 2026</div></div>
-      <div class="sugg" onclick="useS(this)"><div class="sugg-ic">🧬</div><div class="sugg-t">PCDT — Doença de Fabry</div><div class="sugg-d">Terapia de reposição enzimática e elegibilidade</div></div>
-      <div class="sugg" onclick="useS(this)"><div class="sugg-ic">🫁</div><div class="sugg-t">DPOC — PCDT 2025</div><div class="sugg-d">Escalonamento terapêutico e medicamentos SUS</div></div>
-      <div class="sugg" onclick="useS(this)"><div class="sugg-ic">🧠</div><div class="sugg-t">Esclerose Múltipla — DMTs SUS</div><div class="sugg-d">Moduladores disponíveis no SUS — portaria 2024</div></div>
-    </div></div>`;
+    <div class="sugg-g">${getSugestoes()}</div></div>`;
 }
 
 // ── ANALYTICS (Supabase via Edge Function) ──
@@ -621,19 +764,52 @@ async function exportXLSX() {
 // ── MARKDOWN RENDERER ──
 function mdR(t) {
   let h = esc(t);
+  // Remove pipe tables — convert to list format
+  h = h.replace(/\|(.+)\|/g, (match) => {
+    // Skip separator rows (|---|---|)
+    if (/^[\s|:-]+$/.test(match)) return '';
+    // Convert table row to list item
+    const cells = match.split('|').filter(c => c.trim());
+    return cells.map(c => `<li>${c.trim()}</li>`).join('');
+  });
+  // Headers
   h = h.replace(/^#{1,3} (.+)$/gm, '<h4>$1</h4>');
+  h = h.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  // Bold and italic
+  h = h.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   h = h.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Horizontal rule
+  h = h.replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid var(--ln);margin:10px 0">');
+  // Special emoji section headers (═══)
+  h = h.replace(/^═+$/gm, '');
+  // Lists
   h = h.replace(/^[-•] (.+)$/gm, '<li>$1</li>');
   h = h.replace(/^(\d+)\. (.+)$/gm, '<li><strong>$1.</strong> $2</li>');
+  h = h.replace(/^  [-•] (.+)$/gm, '<li class="sub-li">$1</li>');
   h = h.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
-  h = h.replace(/(📄 Fontes?:[\s\S]*?)(?=⚠️|$)/g, m => {
-    const lines = m.split('\n').filter(l => l.trim() && !l.startsWith('📄'));
-    const items = lines.map(l => { const br = /MS|SBC|SBD|SBR|PCDT|Minist|Brasil|CONITEC|Portaria/i.test(l); return `<div class="src-row"><span>📄</span>${esc(l.replace(/^[-•*]/, '').trim())}<span class="sbg ${br ? 'br' : 'il'}">${br ? 'BR' : 'Intl'}</span></div>`; }).join('');
-    return `<div class="src-box"><div class="src-tit">Fontes</div>${items}</div>`;
+  // Source box
+  h = h.replace(/(📄 Fontes?[^\n]*:[\s\S]*?)(?=⚠️|$)/g, m => {
+    const lines = m.split('\n').filter(l => l.trim() && !/^📄 Fontes/.test(l));
+    if (!lines.length) return m;
+    const items = lines.map(l => {
+      const br = /MS|SBC|SBD|SBR|PCDT|Minist|Brasil|CONITEC|Portaria|gov\.br/i.test(l);
+      return `<div class="src-row"><span>📄</span><span>${esc(l.replace(/^[-•*]/, '').trim())}</span><span class="sbg ${br ? 'br' : 'il'}">${br ? 'BR' : 'Intl'}</span></div>`;
+    }).join('');
+    return `<div class="src-box"><div class="src-tit">📄 Fontes Consultadas</div>${items}</div>`;
   });
+  // Warning box
   h = h.replace(/⚠️ (.+)/g, '<div class="warn-r">⚠️ <span>$1</span></div>');
-  h = h.split('\n\n').map(p => { if (p.startsWith('<ul>') || p.startsWith('<div') || p.startsWith('<h4')) return p; const pp = p.replace(/\n/g, ' '); return pp.trim() ? `<p>${pp}</p>` : ''; }).join('');
+  // LME offer box
+  h = h.replace(/(📝 Deseja[^<]+LME[^<]+)/g, '<div class="lme-offer">$1</div>');
+  // Paragraphs
+  const blocks = h.split('\n\n');
+  h = blocks.map(p => {
+    p = p.trim();
+    if (!p) return '';
+    if (p.startsWith('<')) return p;
+    return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+  }).join('');
   return h;
 }
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
