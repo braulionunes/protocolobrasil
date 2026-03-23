@@ -786,6 +786,20 @@ const PROTO_ESTADUAL = {
       "DF: acesso a medicamentos via REMUME-DF além do CEAF federal"
     ]
   },
+  "MA": {
+    nome: "Maranhão",
+    secretaria: "SES-MA",
+    farmacia: "CEAF — Farmácia Estadual de Medicamentos (FEM-MA) em São Luís e regionais",
+    entrega_lme: "FEM-MA em São Luís ou Farmácia Regional nas 19 regiões de saúde do MA",
+    obs_dispensacao: "MA: alguns medicamentos biológicos de alta complexidade podem ter disponibilidade limitada ou estar em processo de credenciamento. Verificar disponibilidade na FEM-MA antes de solicitar.",
+    protocolos_extras: [
+      "MA possui alta prevalência de leishmaniose visceral e tegumentar — referência no HU-UFMA",
+      "Esquistossomose endêmica no MA — triagem e tratamento via APS",
+      "MA: biológicos de maior complexidade (rituximabe, ocrelizumabe, biológicos para doenças raras) podem ter disponibilidade limitada — verificar estoque na FEM-MA (98) 3218-4100",
+      "Em caso de indisponibilidade de biológico: abrir processo administrativo na SES-MA ou acionar Defensoria Pública do Estado",
+      "TB MA: acompanhamento pelo LACEN-MA e hospitais de referência em São Luís"
+    ]
+  },
   "AM": {
     nome: "Amazonas",
     secretaria: "SUSAM",
@@ -800,11 +814,27 @@ const PROTO_ESTADUAL = {
   },
 };
 
+// Medicamentos do CEAF com disponibilidade variável por estado
+// Fonte: relatórios CONASS/CONASEMS e notificações de desabastecimento
+// IMPORTANTE: atualizar conforme informações da SES local
+const MEDS_INDISPONIVEIS_POR_UF = {
+  "MA": ["Rituximabe","Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Natalizumabe","Onasemnogene abeparvovec","Tafamidis","Patisirana","Vutrisirana","Voxelotor","Crizanlizumabe","Evolocumabe","Sacubitril+Valsartana","Dupilumabe","Benralizumabe","Rissanquizumabe","Guselcumabe"],
+  "PI": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Patisirana","Vutrisirana","Voxelotor","Evolocumabe"],
+  "AC": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Voxelotor","Evolocumabe","Dupilumabe"],
+  "AP": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Voxelotor","Evolocumabe"],
+  "RO": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Evolocumabe"],
+  "RR": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Voxelotor","Evolocumabe"],
+  "TO": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Evolocumabe"],
+  "AL": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Evolocumabe"],
+  "SE": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Evolocumabe"],
+  "RN": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana"],
+};
+
 // Fallback para estados sem protocolo específico cadastrado
 const PROTO_PADRAO = {
   farmacia: "CEAF — Farmácia de Medicamentos Especializados da Secretaria Estadual de Saúde",
   entrega_lme: "Farmácia de Alto Custo da Secretaria Estadual de Saúde ou Regional de Saúde de referência",
-  obs_dispensacao: "Consulte a Secretaria Estadual de Saúde para informações sobre dispensação no seu estado."
+  obs_dispensacao: "Consulte a Secretaria Estadual de Saúde para informações sobre disponibilidade local."
 };
 
 function buildSys(q) {
@@ -829,13 +859,15 @@ function buildSys(q) {
   // Injeta contexto do estado do médico
   const uf = user.uf || '';
   const proto = PROTO_ESTADUAL[uf] || PROTO_PADRAO;
+  const medsIndisp = MEDS_INDISPONIVEIS_POR_UF[uf] || [];
   const estadoCtx = uf ? `
 \n\nCONTEXTO ESTADUAL — ${uf} (${proto.nome || uf}):
 - Secretaria: ${proto.secretaria || 'SES-' + uf}
 - Onde retirar medicamentos do CEAF: ${proto.farmacia}
 - Como entregar o LME: ${proto.entrega_lme}
 - Observações: ${proto.obs_dispensacao}
-${proto.protocolos_extras ? '- Protocolos/particularidades estaduais:\n  • ' + proto.protocolos_extras.join('\n  • ') : ''}` : '';
+${proto.protocolos_extras ? '- Protocolos/particularidades estaduais:\n  • ' + proto.protocolos_extras.join('\n  • ') : ''}
+${medsIndisp.length ? `- ⚠️ MEDICAMENTOS COM DISPONIBILIDADE LIMITADA OU INDISPONÍVEIS NO ${uf}: ${medsIndisp.join(', ')}\n  → Para estes medicamentos: informe o médico sobre a limitação, sugira a alternativa disponível no PCDT, e oriente sobre como acionar a SES-${uf} ou Defensoria Pública se necessário.` : '- ✅ Sem restrições conhecidas de disponibilidade estadual para os medicamentos do CEAF.'}` : '';
 
   const fn = Object.entries(filters).filter(([, fv]) => !fv).map(([k]) => k);
   return `Você é o ProtocoloBrasil. Assistente clínico para médicos brasileiros.
