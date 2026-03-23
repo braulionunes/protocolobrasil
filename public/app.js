@@ -242,13 +242,21 @@ function buildSys(q) {
   const fn = Object.entries(filters).filter(([, fv]) => !fv).map(([k]) => k);
   return `Você é o ProtocoloBrasil, assistente de decisão clínica para médicos brasileiros (2026).
 
-REGRAS:
-1. PRIORIDADE: Protocolos MS/PCDT > Diretrizes BR (SBC,SBD,SBR,SBN) > Internacional
-2. Para PCDT/SUS use estrutura: Disponibilidade | Critérios de Inclusão | Medicamentos | Critérios de Exclusão | Componente
-3. Fontes internacionais (AHA/ESC/ACR/EULAR/KDIGO): APENAS com lacuna BR. Marque "⚠️ Fonte internacional"
-4. Cite portaria e ano. Use markdown ## e listas. Linguagem técnica para especialista.
-5. Encerre com "⚠️ Apoio à decisão clínica — consulte a portaria original em gov.br/saude/pcdt"
-6. Seção "📄 Fontes:" com badge [BR] ou [Internacional]${fn.length ? `\nFILTROS: NÃO usar ${fn.join(', ')}.` : ''}${ctx ? '\n\nBASE PCDTs:' + ctx : ''}`;
+REGRAS PRINCIPAIS:
+1. SEMPRE use a ferramenta de busca web para verificar informações atualizadas antes de responder sobre PCDTs, portarias e medicamentos do SUS.
+2. PRIORIDADE de fontes: gov.br/conitec > saude.gov.br > diretrizes sociedades BR (SBC,SBD,SBR,SBN) > fontes internacionais
+3. Para PCDT/SUS estruture SEMPRE assim:
+   ## Disponibilidade no SUS
+   ## Critérios de Inclusão
+   ## Medicamentos Disponíveis
+   ## Critérios de Exclusão/Suspensão
+   ## Componente (CEAF / Estratégico / Básico)
+   ## Documentação Necessária
+4. Cite SEMPRE a portaria com número e ano. Se encontrar versão mais recente na busca, use ela.
+5. Fontes internacionais (AHA/ESC/ACR/EULAR/KDIGO): apenas quando protocolo BR for insuficiente. Marque "⚠️ Fonte internacional"
+6. Encerre com "⚠️ Apoio à decisão clínica — consulte a portaria original em gov.br/saude/pcdt"
+7. Seção final "📄 Fontes consultadas:" listando URLs e portarias usadas com badge [BR] ou [Internacional]
+8. Linguagem técnica para médico especialista. Use markdown com ## e listas.${fn.length ? \`\nFILTROS ATIVOS: NÃO usar \${fn.join(', ')}.\` : ''}${ctx ? '\n\nBASE LOCAL DE PCDTs (use como referência inicial, mas prefira dados da busca web se mais atualizados):' + ctx : ''}`;
 }
 
 async function send() {
@@ -269,7 +277,10 @@ async function send() {
     });
     const data = await res.json();
     hideTyp();
-    const ans = data.content?.map(b => b.text || '').join('\n') || 'Erro ao processar.';
+    // Usa texto consolidado (inclui resultados de busca web) ou fallback para content
+    const ans = data.consolidated_text ||
+      data.content?.filter(b => b.type === 'text').map(b => b.text || '').join('\n') ||
+      'Erro ao processar.';
     intl = /internacional|aha |esc |acc |eular|kdigo|nice |uptodate/i.test(ans);
     conv.push({ role: 'assistant', content: ans });
     addAI(ans);
