@@ -68,11 +68,8 @@ function entrar() {
   myHist = lsGet(`pb_hist_${c}`) || [];
   renderH(myHist);
   renderCat();
-  // Atualiza sugestões da tela inicial com base na especialidade
-  setTimeout(() => {
-    const mainSugg = document.getElementById('main-sugg-g');
-    if (mainSugg) mainSugg.innerHTML = getSugestoes();
-  }, 100);
+  // Reconstrói a tela de boas-vindas com sugestões corretas para a especialidade
+  renderWelcome();
   toast('Bem-vindo(a), ' + n.replace(/^Dr[a]?\.?\s*/i,'').split(' ')[0] + '!', 'ok');
 }
 function gi(id) { return (document.getElementById(id)?.value || '').trim(); }
@@ -130,10 +127,21 @@ function renderH(arr) {
   if (!arr?.length) { el.innerHTML = '<div style="padding:10px;font-size:11px;color:var(--ink4);text-align:center">Sem consultas ainda</div>'; return; }
   el.innerHTML = arr.map((h, i) => `
     <div class="h-item${i === 0 ? ' on' : ''}" onclick="loadSess(${i})">
-      <div class="hi-t">${esc(h.titulo || '')}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">
+        <div class="hi-t" style="flex:1">${esc(h.titulo || '')}</div>
+        <button class="del-btn" onclick="event.stopPropagation();delSess(${i})" title="Excluir consulta">×</button>
+      </div>
       <div class="hi-m">${h.data} · ${h.uf}</div>
       <span class="hi-tag t${h.tipo || 'p'}">${{ k: 'PCDT', i: 'Intl', r: 'Raro', p: 'Protocolo' }[h.tipo || 'p']}</span>
     </div>`).join('');
+}
+
+function delSess(i) {
+  myHist.splice(i, 1);
+  lsSet(`pb_hist_${user.crm}`, myHist);
+  renderH(myHist);
+  // Se deletou a sessão atual, limpa o chat
+  if (i === 0) newChat();
 }
 function filterH(q) { renderH(myHist.filter(h => (h.titulo || '').toLowerCase().includes(q.toLowerCase()))); }
 function loadSess(i) {
@@ -892,6 +900,19 @@ const DEFAULT_SUGG = [
 function getSugestoes() {
   const s = SUGG_BY_ESP[user.esp] || DEFAULT_SUGG;
   return s.map(x => `<div class="sugg" onclick="useS(this)" data-query="${x.q || x.t}"><div class="sugg-ic">${x.ic}</div><div class="sugg-t">${x.t}</div><div class="sugg-d">${x.d}</div></div>`).join('');
+}
+
+function renderWelcome() {
+  const nome = user.nome ? user.nome.replace(/^Dr[a]?\.?\s*/i,'').split(' ')[0] : 'Doutor(a)';
+  const el = document.getElementById('msgs');
+  if (!el) return;
+  el.innerHTML = `<div class="welcome" id="wlc">
+      <div class="wlc-logo">🩺</div>
+      <h2>Olá, ${nome}</h2>
+      <p>Consulte PCDTs, critérios do SUS e diretrizes brasileiras. Banco centralizado Supabase — analytics em tempo real.</p>
+      <div class="db-bar"><div class="pls"></div><span id="dbstat">Pronto para uso</span></div>
+      <div class="sugg-g" id="main-sugg-g">${getSugestoes()}</div>
+    </div>`;
 }
 
 function newChat() {
