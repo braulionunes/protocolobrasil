@@ -247,19 +247,27 @@ async function sendLME() {
   busy = true; document.getElementById('sbtn').disabled = true;
   addU('📝 Gerando rascunho do LME...');
 
-  const lmePrompt = `Com base em toda a conversa anterior sobre o PCDT, gere um rascunho do LME. Responda SOMENTE com JSON válido, sem texto antes ou depois, sem markdown:
-{"cid10":"código CID-10","diagnostico":"nome da doença","medicamento1":"nome genérico + dose + forma farmacêutica","medicamento2":"","qtd_mensal":"quantidade por mês (ex: 30 comprimidos)","anamnese":"resumo clínico: descreva a doença, tempo de evolução, tratamentos prévios realizados com dose e duração, justificativa do medicamento solicitado conforme PCDT","tratamento_previo":"Sim — descreva os tratamentos anteriores ou Não","documentos":"documento1; documento2; documento3","observacoes":"critérios do PCDT que o paciente preenche"}`;
+  // Extrai o medicamento e diagnóstico diretamente da última resposta da IA
+  const lastAI = conv.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
+  const lastUser = conv.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+
+  const lmePrompt = `Com base EXCLUSIVAMENTE na última resposta sobre o caso clínico abaixo, gere o LME.
+ATENÇÃO: Use SOMENTE o diagnóstico e medicamento que foi discutido nesta conversa. NÃO use exemplos de outras doenças.
+
+ÚLTIMA PERGUNTA DO MÉDICO: ${lastUser.slice(0, 300)}
+
+ÚLTIMA RESPOSTA SOBRE O CASO: ${lastAI.slice(0, 800)}
+
+Responda SOMENTE com JSON válido, sem texto antes ou depois:
+{"cid10":"código CID-10 da doença discutida","diagnostico":"nome da doença discutida","medicamento1":"nome genérico completo + dose + forma farmacêutica do medicamento recomendado na resposta acima","medicamento2":"segundo medicamento se houver combinação, senão vazio","qtd_mensal":"quantidade por mês conforme posologia","anamnese":"resumo do caso: diagnóstico, dados clínicos fornecidos (VEF1, scores, etc), tratamentos prévios, justificativa do medicamento conforme PCDT","tratamento_previo":"Sim ou Não — descreva tratamentos anteriores se houver","documentos":"espirometria pós-BD; laudo médico; cartão SUS; RG/CPF (liste os específicos da doença)","observacoes":"critérios do PCDT que o paciente preenche conforme discutido"}`;
 
   try {
     const res = await fetch(API.chat, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system: 'Você é um assistente médico especialista em PCDT do SUS. Responda APENAS com JSON válido e completo, sem markdown, sem texto antes ou depois, sem comentários.',
-        messages: [
-          ...conv.map(m => ({ role: m.role, content: m.content })),
-          { role: 'user', content: lmePrompt }
-        ]
+        system: 'Você é um assistente médico. Leia atentamente o contexto fornecido e responda APENAS com JSON válido. O JSON deve refletir EXATAMENTE a doença e medicamento discutidos no contexto, nunca use exemplos de outras doenças.',
+        messages: [{ role: 'user', content: lmePrompt }]
       }),
     });
 
@@ -659,37 +667,30 @@ function buildSys(q) {
   const fn = Object.entries(filters).filter(([, fv]) => !fv).map(([k]) => k);
   return `Você é o ProtocoloBrasil. Assistente clínico objetivo para médicos brasileiros.
 
-REGRAS DE RESPOSTA:
-1. Seja DIRETO e CONCISO — médico precisa de resposta rápida, sem introduções longas
-2. Máximo 400 palavras por resposta — vá direto ao ponto
-3. Use listas curtas, não parágrafos longos
-4. Para casos clínicos: classificação → medicamento → critérios → LME em 4 blocos apenas
+REGRAS:
+1. Direto ao ponto — sem introduções, sem repetições
+2. Para casos clínicos: classifique → cite os medicamentos DISPONÍVEIS NO SUS com nomes completos → critérios → LME
+3. Sempre cite o nome genérico completo de cada medicamento disponível no SUS para aquela indicação
+4. Use a BASE DE PCDTs abaixo como fonte primária dos medicamentos disponíveis
 
-MEDICAMENTOS — REGRA ABSOLUTA:
-- Busque SEMPRE em conitec.gov.br antes de citar medicamento
-- Use APENAS nome genérico + dose + forma EXATAMENTE como está na portaria vigente
-- NUNCA cite medicamento que não conste na portaria encontrada
-- Se não encontrar: informe "consulte conitec.gov.br" — não invente
-
-ESTRUTURA PARA CASOS CLÍNICOS (máximo 400 palavras):
+ESTRUTURA PARA CASOS CLÍNICOS:
 
 ## Classificação
-[1-2 linhas com classificação do paciente segundo PCDT]
+[Dados do paciente → grupo terapêutico segundo PCDT]
 
-## Medicamento Indicado (portaria nº XX/XXXX)
-**[Nome genérico exato — dose — forma]**
-- Posologia: [conforme portaria]
-- Critérios atendidos: [lista curta ✅]
+## Medicamentos Disponíveis no SUS para esta Indicação
+[Liste TODOS os medicamentos do grupo, com nome genérico completo, dose e forma farmacêutica]
+**Recomendado neste caso:** [qual e por quê]
 
-## Critérios de Inclusão/Exclusão
-[Lista curta — só o essencial]
+## Critérios do PCDT
+[Inclusão / Exclusão — lista curta]
 
-## LME
+## Orientação LME
 CID: [código] | Medicamento: [nome exato] | Qtd: [X/mês]
-Documentos: [lista curta]
+Documentos: [lista]
 
-📄 Fonte: [portaria + link] [BR]
-⚠️ Apoio à decisão — consulte gov.br/saude/pcdt${fn.length ? `\nFILTROS: NÃO usar ${fn.join(', ')}.` : ''}${ctx ? '\n\nBASE PCDTs (referência — portaria vigente tem prioridade):\n' + ctx : ''}`;
+📄 [Portaria] [BR]
+⚠️ Apoio à decisão — consulte gov.br/saude/pcdt${fn.length ? `\nFILTROS: NÃO usar ${fn.join(', ')}.` : ''}${ctx ? '\n\nBASE DE PCDTs — FONTE PRIMÁRIA DE MEDICAMENTOS:\n' + ctx : ''}`;
 }
 
 async function send() {
