@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2500,
+        max_tokens: 3000,
         stream: true,
         system: system || '',
         messages,
@@ -33,24 +33,34 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+
+    // Keep-alive ping every 15s to prevent timeout on long responses
+    const keepAlive = setInterval(() => {
+      try { res.write(': ping\n\n'); } catch {}
+    }, 15000);
 
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
     let sentDone = false;
 
+    const finish = (err) => {
+      clearInterval(keepAlive);
+      if (!sentDone) {
+        sentDone = true;
+        try {
+          res.write(`data: ${JSON.stringify({ done: true, ...(err ? { error: err } : {}) })}\n\n`);
+        } catch {}
+      }
+      try { res.end(); } catch {}
+    };
+
     try {
       while (true) {
         const { done, value } = await reader.read();
-
-        if (done) {
-          // Stream ended — send done event if not already sent
-          if (!sentDone) {
-            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-          }
-          break;
-        }
+        if (done) { finish(); break; }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -59,40 +69,24 @@ export default async function handler(req, res) {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6).trim();
-          if (data === '[DONE]') {
-            if (!sentDone) {
-              res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-              sentDone = true;
-            }
-            continue;
-          }
+          if (data === '[DONE]') { finish(); return; }
           try {
             const evt = JSON.parse(data);
             if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
               res.write(`data: ${JSON.stringify({ text: evt.delta.text })}\n\n`);
             }
-            if (evt.type === 'message_stop') {
-              if (!sentDone) {
-                res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-                sentDone = true;
-              }
-            }
+            if (evt.type === 'message_stop') { finish(); return; }
+            if (evt.type === 'error') { finish(evt.error?.message); return; }
           } catch {}
         }
       }
-    } catch (streamErr) {
-      if (!sentDone) {
-        res.write(`data: ${JSON.stringify({ done: true, error: streamErr.message })}\n\n`);
-      }
+    } catch (e) {
+      finish(e.message);
     }
-
-    res.end();
 
   } catch (err) {
-    if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
-    }
+    if (!res.headersSent) res.status(500).json({ error: err.message });
   }
 }
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 90 };
