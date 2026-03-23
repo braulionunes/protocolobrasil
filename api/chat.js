@@ -1,4 +1,3 @@
-// Função Node.js — sem Edge Runtime (evita timeout de 25s)
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -17,17 +16,44 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'web-search-2025-03-05',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
         system: system || '',
         messages,
+        tools: [{
+          type: 'web_search_20250305',
+          name: 'web_search',
+          max_uses: 3,
+          allowed_domains: [
+            'gov.br',
+            'conitec.gov.br',
+            'saude.gov.br',
+            'ans.gov.br',
+            'cfm.org.br',
+            'pubmed.ncbi.nlm.nih.gov',
+            'who.int',
+            'sbcardiologia.org.br',
+            'reumatologia.org.br',
+            'sbp.com.br',
+            'sbpt.org.br',
+            'sbgastro.org.br',
+            'sbn.org.br',
+          ],
+        }],
       }),
     });
 
     const data = await r.json();
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+
+    // Consolida todos os blocos de texto (incluindo resultados de busca)
+    const text = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n');
+
     return res.status(r.status).json({ ...data, consolidated_text: text });
 
   } catch (err) {
