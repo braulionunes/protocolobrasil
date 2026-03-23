@@ -201,7 +201,7 @@ function askAbout(key) {
 }
 
 // ── CHAT ──
-function useS(el) { document.getElementById('cin').value = el.querySelector('.sugg-d').textContent; send(); }
+function useS(el) { document.getElementById('cin').value = el.dataset.query || el.querySelector('.sugg-t').textContent; send(); }
 function aH(el)   { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
 function onK(e)   { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
 
@@ -393,26 +393,68 @@ async function send() {
   busy = true; document.getElementById('sbtn').disabled = true;
   addU(txt); conv.push({ role: 'user', content: txt });
   showTyp();
-  const tipo = classQ(txt); let intl = false;
+  const tipo = classQ(txt); let intl = false; let fullAns = '';
+
   try {
-    // Chamada à Edge Function (chave segura no servidor)
     const res = await fetch(API.chat, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system: buildSys(txt), messages: conv.map(m => ({ role: m.role, content: m.content })) }),
     });
-    const data = await res.json();
-    hideTyp();
-    // Usa texto consolidado (inclui resultados de busca web) ou fallback para content
-    const ans = data.consolidated_text ||
-      data.content?.filter(b => b.type === 'text').map(b => b.text || '').join('\n') ||
-      'Erro ao processar.';
-    intl = /internacional|aha |esc |acc |eular|kdigo|nice |uptodate/i.test(ans);
-    conv.push({ role: 'assistant', content: ans });
-    addAI(ans);
+
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const ct = res.headers.get('content-type') || '';
+
+    if (ct.includes('text/event-stream')) {
+      hideTyp();
+      const cm = document.getElementById('msgs');
+      const row = document.createElement('div'); row.className = 'm-row ai';
+      const bub = document.createElement('div'); bub.className = 'm-bub';
+      bub.innerHTML = '<span class="stream-cursor">▌</span>';
+      row.innerHTML = '<div class="m-av ai">🩺</div>';
+      row.appendChild(bub); cm.appendChild(row);
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder(); let buf = '';
+      while (true) {
+        const { done, value } = await reader.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n'); buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            if (evt.text) {
+              fullAns += evt.text;
+              bub.innerHTML = mdR(fullAns) + '<span class="stream-cursor">▌</span>';
+              cm.scrollTop = cm.scrollHeight;
+            }
+            if (evt.done) {
+              const isPCDT = /crit[eé]rios|LME|componente|CEAF|portaria|medicamento|SUS/i.test(fullAns);
+              const btns = isPCDT
+                ? `<div class="followup-bar"><button class="followup-btn" onclick="askLME()">📝 Gerar rascunho do LME</button><button class="followup-btn" onclick="askCriteria()">🔍 Critérios por medicamento</button><button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button></div>`
+                : `<div class="followup-bar"><button class="followup-btn" onclick="askFollowup()">💬 Aprofundar tema</button><button class="followup-btn" onclick="askAlternative()">🔄 Protocolo completo MS</button></div>`;
+              bub.innerHTML = mdR(fullAns) + btns;
+              cm.scrollTop = cm.scrollHeight;
+            }
+          } catch {}
+        }
+      }
+    } else {
+      const data = await res.json();
+      hideTyp();
+      fullAns = data.consolidated_text || (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n') || 'Erro ao processar.';
+      addAI(fullAns);
+    }
+
+    intl = /internacional|aha |esc |acc |eular|kdigo|nice |uptodate/i.test(fullAns);
+    conv.push({ role: 'assistant', content: fullAns });
     if (conv.length === 2) { saveSession(txt, intl ? 'i' : tipo); logQ(txt, tipo, intl); }
+    setSyncStatus('Sincronizado ✓');
+
   } catch (e) {
     hideTyp(); addAI('❌ Erro de conexão. Tente novamente.');
+    setSyncStatus('Erro');
   }
   busy = false; document.getElementById('sbtn').disabled = false;
 }
@@ -420,38 +462,38 @@ async function send() {
 // ── SUGESTÕES POR ESPECIALIDADE ──
 const SUGG_BY_ESP = {
   'Cardiologia': [
-    {ic:'🫀',t:'PCDT — Insuficiência Cardíaca',d:'Sacubitril/valsartana e dapagliflozina: critérios SUS'},
-    {ic:'💊',t:'PCDT — Dislipidemia',d:'Evolocumabe: critérios para alto risco cardiovascular'},
-    {ic:'🩺',t:'Amiloidose por Transtirretina 2025',d:'Tafamidis e patisirana: critérios CEAF'},
-    {ic:'⚡',t:'Fibrilação Atrial',d:'Anticoagulantes disponíveis no SUS e fluxograma'},
+    {ic:'🫀',t:'PCDT — Insuficiência Cardíaca',d:'Sacubitril/valsartana e dapagliflozina: critérios SUS',q:'Quais os critérios do PCDT de Insuficiência Cardíaca para uso de sacubitril/valsartana e dapagliflozina no SUS? Detalhe por medicamento e oriente o preenchimento do LME.'},
+    {ic:'💊',t:'PCDT — Dislipidemia',d:'Evolocumabe: critérios para alto risco cardiovascular',q:'Quais os critérios do PCDT de Dislipidemia para uso de evolocumabe (inibidor de PCSK9) no SUS? Quando está indicado e como solicitar?'},
+    {ic:'🩺',t:'Amiloidose por Transtirretina 2025',d:'Tafamidis e patisirana: critérios CEAF',q:'Quais os critérios da portaria 2025 para uso de tafamidis e patisirana na amiloidose por transtirretina (ATTR) pelo CEAF? Detalhe por medicamento.'},
+    {ic:'⚡',t:'Fibrilação Atrial',d:'Anticoagulantes disponíveis no SUS e fluxograma',q:'Quais anticoagulantes estão disponíveis no SUS para fibrilação atrial? Quais os critérios do PCDT e o fluxograma de escolha entre varfarina e os DOACs?'},
   ],
   'Reumatologia': [
-    {ic:'💊',t:'PCDT — Artrite Reumatoide',d:'Biológicos e JAK inibidores: critérios de escolha'},
-    {ic:'🦴',t:'PCDT — Artrite Psoriásica 2026',d:'Secuquinumabe, ixequizumabe: quando indicar'},
-    {ic:'🧬',t:'PCDT — Lúpus Eritematoso',d:'Belimumabe e anifrolumabe: critérios CEAF'},
-    {ic:'💉',t:'PCDT — Espondilite Anquilosante',d:'Biológicos no SUS e critérios BASDAI'},
+    {ic:'💊',t:'PCDT — Artrite Reumatoide',d:'Biológicos e JAK inibidores: critérios de escolha',q:'Quais os critérios do PCDT de Artrite Reumatoide para uso de biológicos e inibidores de JAK no SUS? Detalhe os critérios específicos de cada medicamento e como preencher o LME.'},
+    {ic:'🦴',t:'PCDT — Artrite Psoriásica 2026',d:'Secuquinumabe, ixequizumabe: quando indicar',q:'Quais os critérios da portaria jan/2026 de Artrite Psoriásica para uso de biológicos no SUS? Detalhe quando usar secuquinumabe vs ixequizumabe vs adalimumabe e como solicitar o LME.'},
+    {ic:'🧬',t:'PCDT — Lúpus Eritematoso',d:'Belimumabe e anifrolumabe: critérios CEAF',q:'Quais os critérios do PCDT de Lúpus Eritematoso Sistêmico para uso de belimumabe e anifrolumabe no CEAF? Quais scores e exames são obrigatórios?'},
+    {ic:'💉',t:'PCDT — Espondilite Anquilosante',d:'Biológicos no SUS e critérios BASDAI',q:'Quais os critérios do PCDT de Espondilite Anquilosante para uso de biológicos no SUS? Qual o valor mínimo de BASDAI exigido e quais os biológicos disponíveis?'},
   ],
   'Neurologia': [
-    {ic:'🧠',t:'PCDT — Esclerose Múltipla',d:'DMTs: critérios de escolha por perfil do paciente'},
-    {ic:'💊',t:'PCDT — Atrofia Muscular Espinhal',d:'Nusinersena, risdiplam e gene therapy: elegibilidade'},
-    {ic:'⚡',t:'PCDT — Epilepsia',d:'Canabidiol e antiepilépticos de 2ª linha no SUS'},
-    {ic:'🧬',t:'PCDT — Miastenia Gravis',d:'Eculizumabe: critérios para forma refratária'},
+    {ic:'🧠',t:'PCDT — Esclerose Múltipla',d:'DMTs: critérios de escolha por perfil do paciente',q:'Quais os critérios do PCDT de Esclerose Múltipla 2024 para cada DMT disponível no SUS? Detalhe para qual perfil de paciente está indicado cada medicamento.'},
+    {ic:'💊',t:'PCDT — Atrofia Muscular Espinhal',d:'Nusinersena, risdiplam e gene therapy: elegibilidade',q:'Quais os critérios do PCDT de AME 2023 para nusinersena, risdiplam e onasemnogene abeparvovec? Detalhe os critérios específicos de elegibilidade para cada um.'},
+    {ic:'⚡',t:'PCDT — Epilepsia',d:'Canabidiol e antiepilépticos de 2ª linha no SUS',q:'Quais os critérios do PCDT de Epilepsia para uso de canabidiol e antiepilépticos de segunda linha no SUS? Quando está indicado escalar para segunda linha?'},
+    {ic:'🧬',t:'PCDT — Miastenia Gravis',d:'Eculizumabe: critérios para forma refratária',q:'Quais os critérios para uso de eculizumabe na miastenia gravis refratária pelo SUS? Quais imunoterapias precisam ter falhado antes e quais exames são obrigatórios?'},
   ],
   'Pneumologia': [
-    {ic:'🫁',t:'PCDT — DPOC 2025',d:'Terapia tripla e escalonamento: critérios por paciente'},
-    {ic:'💨',t:'PCDT — Asma Grave',d:'Omalizumabe, dupilumabe, mepolizumabe: qual biológico?'},
-    {ic:'🧬',t:'PCDT — Fibrose Cística',d:'Moduladores CFTR: elegibilidade por genótipo'},
-    {ic:'❤️',t:'PCDT — Hipertensão Pulmonar',d:'Macitentana, selexipague: critérios'},
+    {ic:'🫁',t:'PCDT — DPOC 2025',d:'Terapia tripla e escalonamento: critérios por paciente',q:'Quais os critérios do PCDT de DPOC 2025 para cada medicamento disponível no SUS? Quando está indicada a terapia tripla com furoato de fluticasona + umeclidínio + vilanterol vs outras combinações? Oriente o LME.'},
+    {ic:'💨',t:'PCDT — Asma Grave',d:'Omalizumabe, dupilumabe, mepolizumabe: qual biológico?',q:'Quais os critérios do PCDT de Asma para uso de biológicos no SUS? Detalhe para qual perfil está indicado omalizumabe vs mepolizumabe vs benralizumabe vs dupilumabe, incluindo os exames obrigatórios para cada um.'},
+    {ic:'🧬',t:'PCDT — Fibrose Cística',d:'Moduladores CFTR: elegibilidade por genótipo',q:'Quais os critérios do PCDT de Fibrose Cística para uso dos moduladores CFTR (elexacaftor/tezacaftor/ivacaftor, lumacaftor/ivacaftor) no SUS? Quais genótipos são elegíveis?'},
+    {ic:'❤️',t:'PCDT — Hipertensão Pulmonar',d:'Macitentana, selexipague: critérios',q:'Quais os critérios do PCDT de Hipertensão Arterial Pulmonar para uso de macitentana, selexipague e outros medicamentos do CEAF? Como deve ser o cateterismo de diagnóstico?'},
   ],
   'Gastroenterologia': [
-    {ic:'🩺',t:'PCDT — Doença de Crohn',d:'Biológicos e pequenas moléculas: critérios de escolha'},
-    {ic:'💊',t:'PCDT — Retocolite Ulcerativa',d:'Vedolizumabe, ustecinumabe, tofacitinibe: quando usar'},
-    {ic:'🧬',t:'PCDT — Hepatite C',d:'Antivirais por genótipo disponíveis no SUS'},
+    {ic:'🩺',t:'PCDT — Doença de Crohn',d:'Biológicos e pequenas moléculas: critérios de escolha',q:'Quais os critérios do PCDT de Doença de Crohn para uso de biológicos e pequenas moléculas no SUS? Detalhe quando usar adalimumabe vs infliximabe vs ustecinumabe vs vedolizumabe.'},
+    {ic:'💊',t:'PCDT — Retocolite Ulcerativa',d:'Vedolizumabe, ustecinumabe, tofacitinibe: quando usar',q:'Quais os critérios do PCDT de Retocolite Ulcerativa para biológicos e tofacitinibe no SUS? Quando está indicado cada medicamento e quais as contraindicações específicas?'},
+    {ic:'🧬',t:'PCDT — Hepatite C',d:'Antivirais por genótipo disponíveis no SUS',q:'Quais antivirais de ação direta estão disponíveis no SUS para Hepatite C por genótipo? Quais os critérios do PCDT 2023 e como preencher a solicitação?'},
     {ic:'🫀',t:'PCDT — Doença de Wilson',d:'Critérios diagnósticos e terapêuticos'},
   ],
   'Endocrinologia': [
-    {ic:'💉',t:'PCDT — Diabetes Tipo 2',d:'Empagliflozina e semaglutida: critérios para alto risco CV'},
-    {ic:'🧬',t:'PCDT — Acromegalia 2025',d:'Octreotida LAR, pasireotida, pegvisomanto: quando usar'},
+    {ic:'💉',t:'PCDT — Diabetes Tipo 2',d:'Empagliflozina e semaglutida: critérios para alto risco CV',q:'Quais os critérios do PCDT de Diabetes Mellitus tipo 2 para uso de empagliflozina, dapagliflozina e semaglutida no SUS? Quais evidências de doença cardiovascular ou risco são exigidas?'},
+    {ic:'🧬',t:'PCDT — Acromegalia 2025',d:'Octreotida LAR, pasireotida, pegvisomanto: quando usar',q:'Quais os critérios da portaria 2025 de Acromegalia para uso de análogos de somatostatina, pegvisomanto e pasireotida no CEAF? Detalhe os critérios específicos de cada medicamento.'},
     {ic:'📏',t:'PCDT — Deficiência de GH',d:'Somatropina: critérios diagnósticos e de prescrição'},
     {ic:'💊',t:'PCDT — Puberdade Precoce Central',d:'Análogos de GnRH: elegibilidade e critérios'},
   ],
@@ -462,43 +504,43 @@ const SUGG_BY_ESP = {
     {ic:'💉',t:'DDT — Leucemia Linfoide Aguda',d:'Blinatumomabe, iTK: critérios por perfil molecular'},
   ],
   'Infectologia': [
-    {ic:'🦠',t:'PCDT HIV — TARV 2023',d:'TDF+3TC+DTG: esquemas, resistência e situações especiais'},
-    {ic:'🫁',t:'Manual TB — MS 2024',d:'Esquemas RIPE, TB-MDR: fluxograma diagnóstico e tratamento'},
-    {ic:'🩸',t:'Manual Dengue — MS',d:'Fluxograma de classificação e conduta por grupo de risco'},
+    {ic:'🦠',t:'PCDT HIV — TARV 2023',d:'TDF+3TC+DTG: esquemas, resistência e situações especiais',q:'Qual o esquema preferencial de TARV para HIV pelo PCDT 2023? Quando trocar o esquema, como manejar resistência e quais as situações especiais (gestação, coinfecção TB, hepatite)?'},
+    {ic:'🫁',t:'Manual TB — MS 2024',d:'Esquemas RIPE, TB-MDR: fluxograma diagnóstico e tratamento',q:'Qual o fluxograma do Manual de Tuberculose do MS 2024 para diagnóstico e tratamento? Detalhe os esquemas RIPE, TB-MDR e situações especiais como gestação e coinfecção HIV.'},
+    {ic:'🩸',t:'Manual Dengue — MS',d:'Fluxograma de classificação e conduta por grupo de risco',q:'Qual o fluxograma do MS para classificação e conduta na dengue? Detalhe os grupos A, B, C e D, critérios de internação e sinais de alarme.'},
     {ic:'💊',t:'PCDT — Hepatite B 2023',d:'Tenofovir, entecavir: critérios de início'},
   ],
   'Dermatologia': [
-    {ic:'🧴',t:'PCDT — Psoríase',d:'Biológicos IL-17, IL-23, TNF: critérios de escolha por perfil'},
-    {ic:'💊',t:'PCDT — Hidradenite Supurativa',d:'Adalimumabe, secuquinumabe: critérios Hurley II/III'},
+    {ic:'🧴',t:'PCDT — Psoríase',d:'Biológicos IL-17, IL-23, TNF: critérios de escolha por perfil',q:'Quais os critérios do PCDT de Psoríase para uso de biológicos no SUS? Detalhe quando usar anti-IL-17 (secuquinumabe, ixequizumabe) vs anti-IL-23 (ustequinumabe, rissanquizumabe) vs anti-TNF, e como calcular PASI/DLQI para o LME.'},
+    {ic:'💊',t:'PCDT — Hidradenite Supurativa',d:'Adalimumabe, secuquinumabe: critérios Hurley II/III',q:'Quais os critérios do PCDT de Hidradenite Supurativa para adalimumabe e secuquinumabe no SUS? Quais os critérios de estadiamento Hurley exigidos e como documentar para o LME?'},
     {ic:'🩺',t:'Hanseníase — Manual MS',d:'Fluxograma diagnóstico e esquemas PQT no SUS'},
     {ic:'🧬',t:'Psoríase Ungueal / Artropática',d:'Quando escalar para biológico'},
   ],
   'Hematologia': [
-    {ic:'🩸',t:'PCDT — Anemia Falciforme 2024',d:'Voxelotor, crizanlizumabe: critérios de escolha'},
-    {ic:'💊',t:'PCDT — Hemofilia',d:'Emicizumabe para pacientes com inibidor: critérios'},
+    {ic:'🩸',t:'PCDT — Anemia Falciforme 2024',d:'Voxelotor, crizanlizumabe: critérios de escolha',q:'Quais os critérios do PCDT de Anemia Falciforme 2024 para uso de voxelotor e crizanlizumabe? Quando estão indicados em relação à hidroxiureia e como solicitar pelo CEAF?'},
+    {ic:'💊',t:'PCDT — Hemofilia',d:'Emicizumabe para pacientes com inibidor: critérios',q:'Quais os critérios do PCDT de Hemofilia para uso de emicizumabe em pacientes com inibidor? Como documentar o inibidor e quais os critérios de elegibilidade?'},
     {ic:'🧬',t:'PCDT — Mieloma Múltiplo',d:'Daratumumabe, bortezomibe, lenalidomida: protocolos'},
     {ic:'💉',t:'PCDT — PTI Crônica',d:'Romiplostim, eltrombopague: agonistas de TPO'},
   ],
   'Nefrologia': [
-    {ic:'🫘',t:'PCDT — Doença Renal Crônica',d:'Dapagliflozina, eritropoetina: critérios por estágio'},
+    {ic:'🫘',t:'PCDT — Doença Renal Crônica',d:'Dapagliflozina, eritropoetina: critérios por estágio',q:'Quais os critérios do PCDT de Doença Renal Crônica para uso de dapagliflozina e eritropoetina no SUS? Quais os parâmetros de TFGe, hemoglobina e proteinúria exigidos?'},
     {ic:'💊',t:'PCDT — Síndrome Nefrótica',d:'Rituximabe: critérios para forma refratária'},
     {ic:'🩺',t:'Diretrizes KDIGO — DRC',d:'Metas terapêuticas e escalonamento no Brasil'},
     {ic:'🧬',t:'Transplante Renal — imunossupressão',d:'Tacrolimus, micofenolato: protocolos SUS'},
   ],
   'Pediatria': [
-    {ic:'🧬',t:'PCDT — AME Pediátrica',d:'Risdiplam, nusinersena: critérios por tipo e idade'},
-    {ic:'💊',t:'PCDT — AIJ',d:'Biológicos pediátricos: canacinumabe, tocilizumabe'},
+    {ic:'🧬',t:'PCDT — AME Pediátrica',d:'Risdiplam, nusinersena: critérios por tipo e idade',q:'Quais os critérios do PCDT de AME 2023 para nusinersena, risdiplam e terapia gênica em crianças? Detalhe as janelas de idade, número de cópias SMN2 e critérios por tipo de AME (1, 2, 3).'},
+    {ic:'💊',t:'PCDT — AIJ',d:'Biológicos pediátricos: canacinumabe, tocilizumabe',q:'Quais os critérios do PCDT de Artrite Idiopática Juvenil para uso de biológicos no SUS? Detalhe canacinumabe (AIJ sistêmica), tocilizumabe, adalimumabe e abatacepte: quando indicar cada um?'},
     {ic:'📋',t:'Manual HIV Pediátrico — MS 2023',d:'TARV em crianças: fluxograma MS'},
     {ic:'🫁',t:'PCDT — Fibrose Cística Pediátrica',d:'Moduladores CFTR por genótipo e idade'},
   ],
   'Psiquiatria': [
-    {ic:'🧠',t:'PCDT — Esquizofrenia Refratária',d:'Clozapina: critérios e monitorização obrigatória'},
+    {ic:'🧠',t:'PCDT — Esquizofrenia Refratária',d:'Clozapina: critérios e monitorização obrigatória',q:'Quais os critérios para uso de clozapina na esquizofrenia refratária pelo SUS? Quantos antipsicóticos precisam ter falhado, como documentar a refratariedade e qual a monitorização hematológica obrigatória?'},
     {ic:'💊',t:'Palmitato de Paliperidona IM',d:'Injetável de longa duração: critérios SUS'},
     {ic:'🩺',t:'PCDT — Transtorno Bipolar',d:'Lítio, valproato, quetiapina: escalonamento'},
     {ic:'📋',t:'Manual Saúde Mental — MS',d:'Fluxograma RAPS e rede de atenção psicossocial'},
   ],
   'Ginecologia e Obstetrícia': [
-    {ic:'💊',t:'PCDT — Endometriose',d:'Dienogeste, análogos de GnRH: critérios de escolha'},
+    {ic:'💊',t:'PCDT — Endometriose',d:'Dienogeste, análogos de GnRH: critérios de escolha',q:'Quais os critérios do PCDT de Endometriose para uso de dienogeste e análogos de GnRH no CEAF? Quando está indicado cada medicamento e qual documentação é necessária?'},
     {ic:'🧬',t:'PCDT — SOP',d:'Metformina, ACO, clomifeno: abordagem por fenótipo'},
     {ic:'🦠',t:'Manual IST — MS 2022',d:'Fluxograma diagnóstico e tratamento das ISTs'},
     {ic:'🩺',t:'Pré-natal de Alto Risco',d:'Fluxograma MS para gestantes de risco'},
@@ -510,7 +552,7 @@ const SUGG_BY_ESP = {
     {ic:'🫀',t:'PCDT — Diabetes Tipo 2',d:'Metformina, glibenclamida: critérios e metas'},
   ],
   'Clínica Médica': [
-    {ic:'💊',t:'PCDT — Dor Crônica 2024',d:'Morfina, pregabalina: critérios de escalonamento'},
+    {ic:'💊',t:'PCDT — Dor Crônica 2024',d:'Morfina, pregabalina: critérios de escalonamento',q:'Quais os critérios da Portaria de Dor Crônica 2024 para uso de morfina, pregabalina, duloxetina e outros medicamentos no SUS? Qual o escalonamento terapêutico preconizado?'},
     {ic:'🫀',t:'PCDT — Insuficiência Cardíaca',d:'Sacubitril/valsartana e dapagliflozina: critérios SUS'},
     {ic:'🦠',t:'Manual Dengue — MS',d:'Classificação de risco e fluxograma de conduta'},
     {ic:'🧬',t:'PCDT HIV — TARV 2023',d:'Esquemas, resistência e situações especiais'},
@@ -524,7 +566,7 @@ const DEFAULT_SUGG = [
 ];
 function getSugestoes() {
   const s = SUGG_BY_ESP[user.esp] || DEFAULT_SUGG;
-  return s.map(x => `<div class="sugg" onclick="useS(this)"><div class="sugg-ic">${x.ic}</div><div class="sugg-t">${x.t}</div><div class="sugg-d">${x.d}</div></div>`).join('');
+  return s.map(x => `<div class="sugg" onclick="useS(this)" data-query="${x.q || x.t}"><div class="sugg-ic">${x.ic}</div><div class="sugg-t">${x.t}</div><div class="sugg-d">${x.d}</div></div>`).join('');
 }
 
 function newChat() {
