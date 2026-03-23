@@ -69,9 +69,11 @@ function entrar() {
   renderH(myHist);
   renderCat();
   // Atualiza sugestões da tela inicial com base na especialidade
-  const mainSugg = document.getElementById('main-sugg-g');
-  if (mainSugg) mainSugg.innerHTML = getSugestoes();
-  toast('Bem-vindo(a) ao ProtocoloBrasil!', 'ok');
+  setTimeout(() => {
+    const mainSugg = document.getElementById('main-sugg-g');
+    if (mainSugg) mainSugg.innerHTML = getSugestoes();
+  }, 100);
+  toast('Bem-vindo(a), ' + n.replace(/^Dr[a]?\.?\s*/i,'').split(' ')[0] + '!', 'ok');
 }
 function gi(id) { return (document.getElementById(id)?.value || '').trim(); }
 
@@ -237,38 +239,26 @@ function addAI(txt, sc = true) {
 }
 
 function askLME() {
-  document.getElementById('cin').value = `Com base na consulta anterior, gere um rascunho do LME para este caso. Responda SOMENTE em formato JSON, sem texto adicional, neste modelo exato:
-{
-  "cid10": "código CID-10",
-  "diagnostico": "nome da doença",
-  "medicamento1": "nome genérico + dose + forma farmacêutica",
-  "medicamento2": "",
-  "qtd_mensal": "quantidade por mês",
-  "anamnese": "resumo clínico do caso: início dos sintomas, tratamentos prévios realizados com dose e duração, resposta terapêutica, justificativa do medicamento solicitado",
-  "tratamento_previo": "sim ou não — descrever tratamentos anteriores realizados",
-  "documentos": "lista dos documentos obrigatórios a anexar separados por ponto e vírgula",
-  "observacoes": "critérios específicos do PCDT que o paciente preenche"
-}`;
   sendLME();
 }
 
 async function sendLME() {
   if (busy) return;
-  const inp = document.getElementById('cin');
-  const txt = inp.value.trim(); if (!txt) return;
-  inp.value = ''; inp.style.height = 'auto';
   busy = true; document.getElementById('sbtn').disabled = true;
   addU('📝 Gerando rascunho do LME...');
+
+  const lmePrompt = `Com base em toda a conversa anterior sobre o PCDT, gere um rascunho do LME. Responda SOMENTE com JSON válido, sem texto antes ou depois, sem markdown:
+{"cid10":"código CID-10","diagnostico":"nome da doença","medicamento1":"nome genérico + dose + forma farmacêutica","medicamento2":"","qtd_mensal":"quantidade por mês (ex: 30 comprimidos)","anamnese":"resumo clínico: descreva a doença, tempo de evolução, tratamentos prévios realizados com dose e duração, justificativa do medicamento solicitado conforme PCDT","tratamento_previo":"Sim — descreva os tratamentos anteriores ou Não","documentos":"documento1; documento2; documento3","observacoes":"critérios do PCDT que o paciente preenche"}`;
 
   try {
     const res = await fetch(API.chat, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system: 'Você é um assistente médico. Responda APENAS com JSON válido, sem markdown, sem texto antes ou depois.',
+        system: 'Você é um assistente médico especialista em PCDT do SUS. Responda APENAS com JSON válido e completo, sem markdown, sem texto antes ou depois, sem comentários.',
         messages: [
           ...conv.map(m => ({ role: m.role, content: m.content })),
-          { role: 'user', content: txt }
+          { role: 'user', content: lmePrompt }
         ]
       }),
     });
@@ -1216,6 +1206,21 @@ document.addEventListener('keydown', async (e) => {
     goPage('analytics', document.getElementById('btn-analytics'));
   }
 });
+
+// ── IR PARA INÍCIO (logo clicável) ──
+function irParaInicio() {
+  newChat();
+  // Ativa aba Consulta
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('on'));
+  document.getElementById('pg-chat').classList.add('on');
+  document.querySelectorAll('.nav-btn')[0].classList.add('on');
+  // Atualiza sugestões com especialidade atual
+  setTimeout(() => {
+    const mainSugg = document.getElementById('main-sugg-g');
+    if (mainSugg) mainSugg.innerHTML = getSugestoes();
+  }, 50);
+}
 
 // ── BOOT ──
 init();
