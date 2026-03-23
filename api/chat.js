@@ -10,11 +10,6 @@ export default async function handler(req, res) {
     const { messages, system } = req.body;
     if (!messages) return res.status(400).json({ error: 'Missing messages' });
 
-    // Streaming response
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('X-Accel-Buffering', 'no');
-
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -24,7 +19,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 2500,
         stream: true,
         system: system || '',
         messages,
@@ -33,45 +28,69 @@ export default async function handler(req, res) {
 
     if (!r.ok) {
       const err = await r.text();
-      res.write(`data: ${JSON.stringify({ error: err })}\n\n`);
-      return res.end();
+      return res.status(r.status).json({ error: err });
     }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no');
 
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let sentDone = false;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') continue;
-        try {
-          const evt = JSON.parse(data);
-          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-            res.write(`data: ${JSON.stringify({ text: evt.delta.text })}\n\n`);
-          }
-          if (evt.type === 'message_stop') {
+        if (done) {
+          // Stream ended — send done event if not already sent
+          if (!sentDone) {
             res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
           }
-        } catch {}
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') {
+            if (!sentDone) {
+              res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+              sentDone = true;
+            }
+            continue;
+          }
+          try {
+            const evt = JSON.parse(data);
+            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+              res.write(`data: ${JSON.stringify({ text: evt.delta.text })}\n\n`);
+            }
+            if (evt.type === 'message_stop') {
+              if (!sentDone) {
+                res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+                sentDone = true;
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch (streamErr) {
+      if (!sentDone) {
+        res.write(`data: ${JSON.stringify({ done: true, error: streamErr.message })}\n\n`);
       }
     }
 
     res.end();
+
   } catch (err) {
     if (!res.headersSent) {
       res.status(500).json({ error: err.message });
-    } else {
-      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-      res.end();
     }
   }
 }
