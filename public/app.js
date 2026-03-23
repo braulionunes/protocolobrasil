@@ -258,7 +258,7 @@ REGRAS PRINCIPAIS:
 5. Fontes internacionais (AHA/ESC/ACR/EULAR/KDIGO): apenas quando protocolo BR for insuficiente. Marque "⚠️ Fonte internacional"
 6. Encerre com "⚠️ Apoio à decisão clínica — consulte a portaria original em gov.br/saude/pcdt"
 7. Seção final "📄 Fontes consultadas:" listando URLs e portarias usadas com badge [BR] ou [Internacional]
-8. Linguagem técnica para médico especialista. Use markdown com ## e listas.${fn.length ? \`\nFILTROS ATIVOS: NÃO usar \${fn.join(', ')}.\` : ''}${ctx ? '\n\nBASE LOCAL DE PCDTs (use como referência inicial, mas prefira dados da busca web se mais atualizados):' + ctx : ''}`;
+8. Linguagem técnica para médico especialista. Use markdown com ## e listas.${fn.length ? '\nFILTROS ATIVOS: NÃO usar ' + fn.join(', ') + '.' : ''}${ctx ? '\n\nBASE LOCAL DE PCDTs (use como referência inicial, mas prefira dados da busca web se mais atualizados):' + ctx : ''}`;
 }
 
 async function send() {
