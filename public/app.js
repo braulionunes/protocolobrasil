@@ -195,8 +195,10 @@ function renderCat(q = '') {
 }
 function filterCat(q) { renderCat(q); }
 function askAbout(key) {
+  newChat();
   goPage('chat', document.querySelectorAll('.nav-btn')[0]);
-  document.getElementById('cin').value = `Critérios PCDT e medicamentos SUS para ${key}?`;
+  const name = key.replace(/-/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+  document.getElementById('cin').value = `Quais os critérios do PCDT de ${name} para medicamentos de alto custo no SUS? Detalhe os critérios específicos por medicamento e oriente o preenchimento do LME.`;
   send();
 }
 
@@ -429,13 +431,16 @@ async function send() {
               bub.innerHTML = mdR(fullAns) + '<span class="stream-cursor">▌</span>';
               cm.scrollTop = cm.scrollHeight;
             }
-            if (evt.done) {
+            if (evt.done || evt.error) {
               const isPCDT = /crit[eé]rios|LME|componente|CEAF|portaria|medicamento|SUS/i.test(fullAns);
               const btns = isPCDT
                 ? `<div class="followup-bar"><button class="followup-btn" onclick="askLME()">📝 Gerar rascunho do LME</button><button class="followup-btn" onclick="askCriteria()">🔍 Critérios por medicamento</button><button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button></div>`
                 : `<div class="followup-bar"><button class="followup-btn" onclick="askFollowup()">💬 Aprofundar tema</button><button class="followup-btn" onclick="askAlternative()">🔄 Protocolo completo MS</button></div>`;
               bub.innerHTML = mdR(fullAns) + btns;
               cm.scrollTop = cm.scrollHeight;
+              // Reset busy so follow-up buttons work
+              busy = false;
+              document.getElementById('sbtn').disabled = false;
             }
           } catch {}
         }
