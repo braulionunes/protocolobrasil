@@ -653,6 +653,160 @@ function classQ(q) {
   return 'p';
 }
 
+// ── PROTOCOLOS ESTADUAIS ──
+const PROTO_ESTADUAL = {
+  "SP": {
+    nome: "São Paulo",
+    secretaria: "SES-SP",
+    farmacia: "CEAF — Farmácias Dose Certa (unidades credenciadas pelo estado)",
+    entrega_lme: "Farmácia Dose Certa do município de residência ou polo regional",
+    obs_dispensacao: "SP exige cadastro prévio no sistema HYGIA. Documentação via e-SUS ou presencial.",
+    protocolos_extras: [
+      "Protocolo SP para Hepatite C: inclui genotipagem obrigatória pelo IAL antes de iniciar DAA",
+      "Programa Dose Certa SP: distribuição descentralizada — verificar farmácia mais próxima em www.farmaciadosecerta.sp.gov.br",
+      "SP possui protocolo próprio para TB-MDR com acompanhamento no Instituto Emílio Ribas e Hospital Nestor Goulart Reis",
+      "Oncologia: tratamento via RUTE/CACON/UNACON — encaminhar ao serviço de referência regional",
+      "Saúde Mental SP: caps.saude.sp.gov.br — rede CAPS para dispensação de psicofármacos de alto custo"
+    ]
+  },
+  "RJ": {
+    nome: "Rio de Janeiro",
+    secretaria: "SES-RJ",
+    farmacia: "CEAF — Central de Medicamentos do RJ (CEMEFARJ) e farmácias regionais",
+    entrega_lme: "CEMEFARJ ou farmácia regional da SES-RJ",
+    obs_dispensacao: "RJ: LME deve ser entregue na regional de saúde de referência do município.",
+    protocolos_extras: [
+      "RJ possui protocolo estadual para HIV com distribuição nas UDMs (Unidades Dispensadoras de Medicamentos)",
+      "Hepatite C RJ: triagem e acompanhamento pelos Centros de Referência em DST/AIDS",
+      "Oncologia RJ: INCA como referência nacional — encaminhar casos complexos"
+    ]
+  },
+  "MG": {
+    nome: "Minas Gerais",
+    secretaria: "SES-MG",
+    farmacia: "CEAF — Farmácias de Medicamentos Excepcionais (FME)",
+    entrega_lme: "FME do município ou macrorregião de saúde (Belo Horizonte, Juiz de Fora, Uberlândia, Montes Claros, etc.)",
+    obs_dispensacao: "MG: sistema SISREG para encaminhamento. LME via SISAFAR-MG.",
+    protocolos_extras: [
+      "MG possui protocolo próprio para doenças raras: NUPAD/UFMG como referência para triagem neonatal ampliada",
+      "Protocolo MG para Hepatite C: triagem via Hemocentros regionais (HEMOMINAS)",
+      "TB MG: acompanhamento pelos CRTs (Centros de Referência em Tuberculose) regionais"
+    ]
+  },
+  "RS": {
+    nome: "Rio Grande do Sul",
+    secretaria: "SES-RS",
+    farmacia: "CEAF — Assistência Farmacêutica Estadual (AFRS)",
+    entrega_lme: "Farmácia estadual de referência ou DAF regional",
+    obs_dispensacao: "RS: sistema de dispensação via FARMÁCIA CIDADÃ ESTADUAL e postos regionais.",
+    protocolos_extras: [
+      "RS possui protocolo estadual para dor crônica com dispensação via CAPS AD",
+      "Programa RS para Hepatite C com rastreamento em populações-chave",
+      "Oncologia RS: Hospital de Clínicas de Porto Alegre (HCPA) como referência terciária"
+    ]
+  },
+  "BA": {
+    nome: "Bahia",
+    secretaria: "SES-BA",
+    farmacia: "CEAF — CAFAS (Central de Assistência Farmacêutica)",
+    entrega_lme: "CAFAS Salvador ou farmácias regionais das 28 regiões de saúde da BA",
+    obs_dispensacao: "BA: documentação e LME entregues na DIRES (Diretoria Regional de Saúde) de referência.",
+    protocolos_extras: [
+      "BA possui alta prevalência de anemia falciforme — protocolo estadual com HEMOBA como referência",
+      "Leishmaniose visceral endêmica no BA — acompanhamento pelos CCZ municipais e hospitais de referência",
+      "TB BA: programa estadual com acompanhamento pelo LACEN-BA"
+    ]
+  },
+  "PR": {
+    nome: "Paraná",
+    secretaria: "SESA-PR",
+    farmacia: "CEAF — Central de Medicamentos do Paraná (CEMEPAR)",
+    entrega_lme: "CEMEPAR Curitiba ou farmácias regionais (22 Regionais de Saúde do PR)",
+    obs_dispensacao: "PR: solicitação via SISAFAR-PR. Retirada na regional de saúde do município.",
+    protocolos_extras: [
+      "PR possui protocolo próprio para saúde do idoso com dispensação priorizada de medicamentos do CEAF",
+      "Oncologia PR: Hospital Erasto Gaertner e HC-UFPR como referências estaduais",
+      "TB PR: acompanhamento pelo LACEN-PR e pneumologistas das regionais"
+    ]
+  },
+  "PE": {
+    nome: "Pernambuco",
+    secretaria: "SES-PE",
+    farmacia: "CEAF — Assistência Farmacêutica Estadual de PE",
+    entrega_lme: "Farmácia de Medicamentos Especializados (FME) da Gerência Regional de Saúde",
+    obs_dispensacao: "PE: 12 Gerências Regionais de Saúde (GERES). LME na GERES de referência.",
+    protocolos_extras: [
+      "PE possui alta incidência de arboviroses — protocolo estadual para dengue/zika/chikungunya",
+      "Leishmaniose visceral endêmica no sertão pernambucano",
+      "Oncologia PE: IMIP e Hospital de Câncer de Pernambuco como referências"
+    ]
+  },
+  "CE": {
+    nome: "Ceará",
+    secretaria: "SESA-CE",
+    farmacia: "CEAF — Farmácia da Secretaria de Saúde (Núcleo de Assistência Farmacêutica)",
+    entrega_lme: "Farmácia Estadual em Fortaleza ou CRES (Coordenadoria Regional de Saúde)",
+    obs_dispensacao: "CE: 22 coordenadorias regionais de saúde. Dispensação descentralizada.",
+    protocolos_extras: [
+      "CE possui protocolo estadual para doenças endêmicas: leishmaniose, esquistossomose, dengue",
+      "Alta prevalência de doença de Chagas no CE — protocolo de triagem e tratamento via LACEN-CE"
+    ]
+  },
+  "GO": {
+    nome: "Goiás",
+    secretaria: "SES-GO",
+    farmacia: "CEAF — Superintendência de Assistência Farmacêutica de GO",
+    entrega_lme: "Farmácia de Alto Custo nas 18 Regionais de Saúde de GO",
+    obs_dispensacao: "GO: sistema E-SAÚDE para solicitação eletrônica do LME em alguns municípios.",
+    protocolos_extras: [
+      "GO possui protocolo estadual para doença de Chagas — endêmica na região",
+      "Oncologia GO: Hospital Araújo Jorge como referência estadual"
+    ]
+  },
+  "SC": {
+    nome: "Santa Catarina",
+    secretaria: "SES-SC",
+    farmacia: "CEAF — DIAF (Diretoria de Assistência Farmacêutica de SC)",
+    entrega_lme: "Farmácia Escola UFSC ou farmácias regionais das 16 SDR (Secretarias de Desenvolvimento Regional)",
+    obs_dispensacao: "SC: HÓRUS sistema de dispensação estadual. LME eletrônico disponível em alguns municípios.",
+    protocolos_extras: [
+      "SC possui protocolo integrado para doenças raras com referência no HU-UFSC",
+      "Oncologia SC: CEPON (Centro de Pesquisas Oncológicas) como referência estadual"
+    ]
+  },
+  "DF": {
+    nome: "Distrito Federal",
+    secretaria: "SES-DF",
+    farmacia: "CEAF — NAFAR (Núcleo de Assistência Farmacêutica) — dispensação via hospitais da REDE-DF",
+    entrega_lme: "Farmácia do hospital de referência da rede SES-DF (HUB, HBDF, HMIB, etc.)",
+    obs_dispensacao: "DF: dispensação integrada à rede hospitalar. Solicitar via GDF Saúde.",
+    protocolos_extras: [
+      "DF possui referência nacional para doenças raras — HBDF e UNB como centros de excelência",
+      "Oncologia DF: HBDF (Hospital de Base) como referência primária",
+      "DF: acesso a medicamentos via REMUME-DF além do CEAF federal"
+    ]
+  },
+  "AM": {
+    nome: "Amazonas",
+    secretaria: "SUSAM",
+    farmacia: "CEAF — Gerência de Assistência Farmacêutica do AM",
+    entrega_lme: "Farmácia de Alto Custo em Manaus ou municípios do interior via SCTIE regional",
+    obs_dispensacao: "AM: acesso dificultado no interior — telemedecina e farmácia itinerante disponíveis.",
+    protocolos_extras: [
+      "AM possui protocolos específicos para malária — referência no FMT-HVD (Fundação de Medicina Tropical)",
+      "Leishmaniose tegumentar endêmica no AM — acompanhamento pelo FMT",
+      "AM possui alta prevalência de hepatites virais B e C — triagem prioritária em comunidades ribeirinhas"
+    ]
+  },
+};
+
+// Fallback para estados sem protocolo específico cadastrado
+const PROTO_PADRAO = {
+  farmacia: "CEAF — Farmácia de Medicamentos Especializados da Secretaria Estadual de Saúde",
+  entrega_lme: "Farmácia de Alto Custo da Secretaria Estadual de Saúde ou Regional de Saúde de referência",
+  obs_dispensacao: "Consulte a Secretaria Estadual de Saúde para informações sobre dispensação no seu estado."
+};
+
 function buildSys(q) {
   let ctx = '';
   const qn = q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -672,6 +826,17 @@ function buildSys(q) {
       ctx += `\n\n[PCDT: ${k.toUpperCase()} | ${v.portaria} | ${v.comp}]${medsTxt}\nCritérios:\n${v.criterios.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
     }
   }
+  // Injeta contexto do estado do médico
+  const uf = user.uf || '';
+  const proto = PROTO_ESTADUAL[uf] || PROTO_PADRAO;
+  const estadoCtx = uf ? `
+\n\nCONTEXTO ESTADUAL — ${uf} (${proto.nome || uf}):
+- Secretaria: ${proto.secretaria || 'SES-' + uf}
+- Onde retirar medicamentos do CEAF: ${proto.farmacia}
+- Como entregar o LME: ${proto.entrega_lme}
+- Observações: ${proto.obs_dispensacao}
+${proto.protocolos_extras ? '- Protocolos/particularidades estaduais:\n  • ' + proto.protocolos_extras.join('\n  • ') : ''}` : '';
+
   const fn = Object.entries(filters).filter(([, fv]) => !fv).map(([k]) => k);
   return `Você é o ProtocoloBrasil. Assistente clínico para médicos brasileiros.
 
@@ -704,7 +869,7 @@ CID: [código] | Medicamento: [nome exato da BASE]
 Documentos obrigatórios: [lista]
 
 📄 [Portaria da BASE] [BR]
-⚠️ Apoio à decisão — consulte gov.br/saude/pcdt${fn.length ? `\nFILTROS: NÃO usar ${fn.join(', ')}.` : ''}${ctx ? '\n\n════ BASE DE PCDTs — USE EXCLUSIVAMENTE ESTES DADOS ════\n' + ctx : ''}`;
+⚠️ Apoio à decisão — consulte gov.br/saude/pcdt${fn.length ? `\nFILTROS: NÃO usar ${fn.join(', ')}.` : ''}${estadoCtx}${ctx ? '\n\n════ BASE DE PCDTs — USE EXCLUSIVAMENTE ESTES DADOS ════\n' + ctx : ''}`;
 }
 
 async function send() {
