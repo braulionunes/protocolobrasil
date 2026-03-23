@@ -814,20 +814,37 @@ const PROTO_ESTADUAL = {
   },
 };
 
-// Medicamentos do CEAF com disponibilidade variável por estado
-// Fonte: relatórios CONASS/CONASEMS e notificações de desabastecimento
-// IMPORTANTE: atualizar conforme informações da SES local
-const MEDS_INDISPONIVEIS_POR_UF = {
-  "MA": ["Rituximabe","Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Natalizumabe","Onasemnogene abeparvovec","Tafamidis","Patisirana","Vutrisirana","Voxelotor","Crizanlizumabe","Evolocumabe","Sacubitril+Valsartana","Dupilumabe","Benralizumabe","Rissanquizumabe","Guselcumabe"],
-  "PI": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Patisirana","Vutrisirana","Voxelotor","Evolocumabe"],
-  "AC": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Voxelotor","Evolocumabe","Dupilumabe"],
-  "AP": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Voxelotor","Evolocumabe"],
-  "RO": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Evolocumabe"],
-  "RR": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Voxelotor","Evolocumabe"],
-  "TO": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Evolocumabe"],
-  "AL": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Evolocumabe"],
-  "SE": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana","Evolocumabe"],
-  "RN": ["Ocrelizumabe","Ofatumumabe","Alentuzumabe","Cladribina","Onasemnogene abeparvovec","Tafamidis","Vutrisirana"],
+// Contatos das Secretarias Estaduais de Saúde para verificação de disponibilidade
+// O CEAF é descentralizado — cada estado tem sua própria lista de medicamentos disponíveis
+// Fonte: sites oficiais das SES (verificado Mar/2026)
+const SES_CONTATOS = {
+  "AC": {site:"http://saude.ac.gov.br", farmacia:"DAF/SESACRE — (68) 3223-0210", obs:"Verificar lista no site da SESACRE"},
+  "AL": {site:"http://saude.al.gov.br", farmacia:"DAF/SESAU-AL — (82) 3315-1616", obs:"Farmácia Estadual em Maceió"},
+  "AP": {site:"http://saude.ap.gov.br", farmacia:"SESA-AP — (96) 3312-1430", obs:"Macapá — verificar disponibilidade local"},
+  "AM": {site:"http://susam.am.gov.br", farmacia:"GAFAR/SUSAM — (92) 3182-7009", obs:"Farmácia Estadual Manaus. Interior: acesso limitado a biológicos de alta complexidade"},
+  "BA": {site:"http://saude.ba.gov.br", farmacia:"CAFAS/SESAB — (71) 3116-1270", obs:"28 regionais. HEMOBA para hemopatias"},
+  "CE": {site:"http://saude.ce.gov.br", farmacia:"NAFE/SESA-CE — (85) 3101-4712", obs:"22 coordenadorias regionais"},
+  "DF": {site:"http://saude.df.gov.br", farmacia:"NAFAR/SES-DF — (61) 3346-9050", obs:"Dispensação via hospitais da REDE-DF"},
+  "ES": {site:"http://saude.es.gov.br", farmacia:"AFAS/SESA-ES — (27) 3636-7300", obs:"Farmácia Estadual Vitória + regionais"},
+  "GO": {site:"http://saude.go.gov.br", farmacia:"SAFAR/SES-GO — (62) 3201-5804", obs:"18 regionais. Sistema E-SAÚDE"},
+  "MA": {site:"http://saude.ma.gov.br", farmacia:"FEM-MA/SES-MA — (98) 3218-4100", obs:"Biológicos de alta complexidade: verificar disponibilidade prévia na FEM-MA. Alguns podem estar em processo de credenciamento"},
+  "MT": {site:"http://saude.mt.gov.br", farmacia:"AFMT/SES-MT — (65) 3613-7606", obs:"Farmácia Estadual Cuiabá + regionais"},
+  "MS": {site:"http://saude.ms.gov.br", farmacia:"DAF/SES-MS — (67) 3318-1550", obs:"Campo Grande + regionais"},
+  "MG": {site:"http://saude.mg.gov.br", farmacia:"FME/SES-MG — (31) 3339-9300", obs:"Sistema SISAFAR-MG. HEMOMINAS para hemopatias"},
+  "PA": {site:"http://saude.pa.gov.br", farmacia:"DAF/SESPA — (91) 4006-6280", obs:"Belém + regionais. Interior: acesso pode ser limitado"},
+  "PB": {site:"http://saude.pb.gov.br", farmacia:"DAF/SES-PB — (83) 3218-8228", obs:"Farmácia Estadual João Pessoa + regionais"},
+  "PR": {site:"http://saude.pr.gov.br", farmacia:"CEMEPAR/SESA-PR — (41) 3330-4200", obs:"22 regionais. 96% municípios cobertos. Sistema SISAFAR-PR"},
+  "PE": {site:"http://saude.pe.gov.br", farmacia:"GERES/SES-PE — (81) 3184-6300", obs:"12 GERES. Farmácias Especializadas regionais"},
+  "PI": {site:"http://saude.pi.gov.br", farmacia:"DAF/SESAPI — (86) 3216-3688", obs:"Teresina + regionais. Verificar disponibilidade de biológicos"},
+  "RJ": {site:"http://saude.rj.gov.br", farmacia:"CEMEFARJ/SES-RJ — (21) 2333-7500", obs:"UDMs para HIV. Regionais para demais CEAF"},
+  "RN": {site:"http://saude.rn.gov.br", farmacia:"DAF/SESAP-RN — (84) 3232-1500", obs:"Natal + regionais"},
+  "RS": {site:"http://saude.rs.gov.br/medicamentos-disponibilizados", farmacia:"DAF/SES-RS — (51) 3288-5800", obs:"316 itens padronizados. Programa de Medicamentos Especiais estadual adicional"},
+  "RO": {site:"http://saude.ro.gov.br", farmacia:"DAF/SESAU-RO — (69) 3216-6027", obs:"Porto Velho + regionais. Interior: acesso limitado"},
+  "RR": {site:"http://saude.rr.gov.br", farmacia:"DAF/SESAU-RR — (95) 2121-0150", obs:"Boa Vista — verificar disponibilidade de medicamentos de alta complexidade"},
+  "SC": {site:"http://saude.sc.gov.br", farmacia:"DIAF/SES-SC — (48) 3665-1600", obs:"Sistema HÓRUS. Farmácias municipais descentralizadas"},
+  "SP": {site:"http://saude.sp.gov.br", farmacia:"Farmácia Dose Certa — 0800 722 4848", obs:"Maior rede do Brasil. Sistema HYGIA. www.farmaciadosecerta.sp.gov.br"},
+  "SE": {site:"http://saude.se.gov.br", farmacia:"DAF/SES-SE — (79) 3226-7300", obs:"Aracaju + regionais"},
+  "TO": {site:"http://saude.to.gov.br", farmacia:"DAF/SES-TO — (63) 3218-1700", obs:"Palmas + regionais. Verificar biológicos de alta complexidade"},
 };
 
 // Fallback para estados sem protocolo específico cadastrado
@@ -859,15 +876,15 @@ function buildSys(q) {
   // Injeta contexto do estado do médico
   const uf = user.uf || '';
   const proto = PROTO_ESTADUAL[uf] || PROTO_PADRAO;
-  const medsIndisp = MEDS_INDISPONIVEIS_POR_UF[uf] || [];
+  const sesInfo = SES_CONTATOS[uf] || null;
   const estadoCtx = uf ? `
 \n\nCONTEXTO ESTADUAL — ${uf} (${proto.nome || uf}):
 - Secretaria: ${proto.secretaria || 'SES-' + uf}
-- Onde retirar medicamentos do CEAF: ${proto.farmacia}
-- Como entregar o LME: ${proto.entrega_lme}
-- Observações: ${proto.obs_dispensacao}
-${proto.protocolos_extras ? '- Protocolos/particularidades estaduais:\n  • ' + proto.protocolos_extras.join('\n  • ') : ''}
-${medsIndisp.length ? `- ⚠️ MEDICAMENTOS COM DISPONIBILIDADE LIMITADA OU INDISPONÍVEIS NO ${uf}: ${medsIndisp.join(', ')}\n  → Para estes medicamentos: informe o médico sobre a limitação, sugira a alternativa disponível no PCDT, e oriente sobre como acionar a SES-${uf} ou Defensoria Pública se necessário.` : '- ✅ Sem restrições conhecidas de disponibilidade estadual para os medicamentos do CEAF.'}` : '';
+- Onde retirar medicamentos do CEAF: ${sesInfo ? sesInfo.farmacia : proto.farmacia}
+- Site oficial: ${sesInfo ? sesInfo.site : 'site da SES-' + uf}
+- Observação local: ${sesInfo ? sesInfo.obs : proto.obs_dispensacao}
+${proto.protocolos_extras ? '- Particularidades estaduais:\n  • ' + proto.protocolos_extras.join('\n  • ') : ''}
+- ⚠️ DISPONIBILIDADE ESTADUAL: O CEAF é descentralizado — cada estado define seus medicamentos disponíveis. SEMPRE oriente o médico a confirmar disponibilidade na SES-${uf} antes de solicitar, especialmente para biológicos de alta complexidade recém-incorporados. Em caso de indisponibilidade: orientar abertura de processo administrativo na SES ou acionamento da Defensoria Pública.` : '';
 
   const fn = Object.entries(filters).filter(([, fv]) => !fv).map(([k]) => k);
   return `Você é o ProtocoloBrasil. Assistente clínico para médicos brasileiros.
