@@ -334,8 +334,8 @@ tr:hover td{background:var(--ln3);}
   <div class="h-r">
     <button class="nav-btn on"           onclick="goPage('chat',this)">💬 Consulta</button>
     <button class="nav-btn"              onclick="goPage('catalog',this)">📚 Catálogo</button>
-    <button class="nav-btn"              onclick="goPage('analytics',this)">📊 Analytics</button>
-    <button class="nav-btn export-nav"   onclick="goPage('export',this)">📥 Exportar</button>
+    <button class="nav-btn" id="btn-analytics" onclick="goPage('analytics',this)" style="display:none">📊 Analytics</button>
+    <button class="nav-btn export-nav" id="btn-export" onclick="goPage('export',this)" style="display:none">📥 Exportar</button>
     <div class="u-pill"><div class="u-av" id="uav">MD</div><span id="ulbl">—</span></div>
   </div>
 </header>
@@ -518,6 +518,7 @@ tr:hover td{background:var(--ln3);}
 </div><!-- /body -->
 </div><!-- /app -->
 <div class="toast" id="toast"></div>
+<!-- Acesso admin: pressione Ctrl+Shift+A -->
 
 <script src="pcdt-data.js"></script>
 <script src="app.js"></script>

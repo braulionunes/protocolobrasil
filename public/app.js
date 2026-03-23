@@ -71,14 +71,45 @@ function entrar() {
 }
 function gi(id) { return (document.getElementById(id)?.value || '').trim(); }
 
+// ── ADMIN AUTH ──
+// Para trocar a senha: gere o SHA256 da sua senha em: https://emn178.github.io/online-tools/sha256.html
+// Senha atual: admin123 — TROQUE ANTES DE PUBLICAR
+const ADMIN_HASH = '5641e3f5c46432b1bf043cf93eaf3736feddb207177aaf2efb6f19c942558e65';
+let adminUnlocked = false;
+
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkAdmin() {
+  if (adminUnlocked) return true;
+  const pwd = prompt('\u{1F512} Área restrita — senha do administrador:');
+  if (!pwd) return false;
+  const hash = await sha256(pwd);
+  if (hash === ADMIN_HASH) { adminUnlocked = true; return true; }
+  toast('Senha incorreta.', 'err');
+  return false;
+}
+
 // ── NAV ──
 function goPage(id, btn) {
+  if (id === 'analytics' || id === 'export') {
+    checkAdmin().then(ok => {
+      if (!ok) return;
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('on'));
+      document.getElementById('pg-' + id).classList.add('on');
+      btn.classList.add('on');
+      if (id === 'analytics') loadAnalytics();
+      if (id === 'export')    loadExport();
+    });
+    return;
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('on'));
   document.getElementById('pg-' + id).classList.add('on');
   btn.classList.add('on');
-  if (id === 'analytics') loadAnalytics();
-  if (id === 'export')    loadExport();
 }
 
 // ── FILTERS ──
@@ -519,6 +550,20 @@ function toast(msg, type) {
   t.className = 'toast' + (type ? ' ' + type : ''); t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 4000);
 }
+
+// ── ACESSO ADMIN SECRETO (Ctrl+Shift+A) ──
+document.addEventListener('keydown', async (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+    const ok = await checkAdmin();
+    if (!ok) return;
+    // Mostra os botões ocultos
+    document.getElementById('btn-analytics').style.display = '';
+    document.getElementById('btn-export').style.display = '';
+    toast('Modo administrador ativado', 'ok');
+    // Abre analytics automaticamente
+    goPage('analytics', document.getElementById('btn-analytics'));
+  }
+});
 
 // ── BOOT ──
 init();
