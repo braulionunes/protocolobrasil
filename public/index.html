@@ -272,6 +272,12 @@ tr:hover td{background:var(--ln3);}
 .toast.ok{background:var(--teal);}
 .toast.err{background:var(--red);}
 .stream-cursor{display:inline-block;animation:blink .7s step-end infinite;color:var(--teal);font-weight:700;}
+.med-esp-row{padding:7px 0;border-bottom:1px solid var(--ln2);display:flex;align-items:flex-start;gap:8px;}
+.med-esp-row:last-child{border-bottom:none;}
+.med-esp-name{font-size:12px;font-weight:600;color:var(--ink2);width:140px;flex-shrink:0;}
+.med-esp-pills{display:flex;flex-wrap:wrap;gap:4px;}
+.med-pill{background:var(--tl);color:var(--teal);font-size:11px;padding:2px 8px;border-radius:20px;}
+.med-pill strong{color:var(--navy);}
 .searching-ind{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--teal);background:var(--txl);border-radius:8px;padding:7px 11px;margin-bottom:6px;animation:pulse2 1.5s infinite;}
 @keyframes pulse2{0%,100%{opacity:1}50%{opacity:.6}}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0;}}
@@ -499,6 +505,9 @@ tr:hover td{background:var(--ln3);}
       <div class="an-c full"><h3>Mapa de calor por UF</h3><div class="map-g" id="an-map"></div></div>
       <div class="an-c"><h3>Palavras-chave</h3><div class="tags" id="an-tags"></div></div>
       <div class="an-c"><h3>Tipo de fonte</h3><div id="an-src"></div></div>
+      <div class="an-c full"><h3>💊 Medicamentos mais pesquisados</h3><div id="an-meds"></div></div>
+      <div class="an-c"><h3>💊 Top medicamentos por especialidade</h3><div id="an-meds-esp"></div></div>
+      <div class="an-c"><h3>🗺️ Medicamentos por estado</h3><div id="an-meds-uf"></div></div>
     </div>
   </div>
 </div>

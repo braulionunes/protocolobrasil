@@ -14,7 +14,7 @@ export default async function handler(req) {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
   try {
-    const { crm, uf, esp, query, tipo, intl } = await req.json();
+    const { crm, uf, esp, query, tipo, intl, medicamentos } = await req.json();
 
     if (!crm || !uf || !query) {
       return new Response(JSON.stringify({ error: 'Missing fields' }), {
@@ -39,6 +39,7 @@ export default async function handler(req) {
         query,
         tipo,
         fonte_internacional: intl,
+        medicamentos: medicamentos || null,
         criado_em: new Date().toISOString(),
       }),
     });

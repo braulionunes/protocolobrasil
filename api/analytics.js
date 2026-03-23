@@ -20,7 +20,7 @@ export default async function handler(req) {
 
   try {
     // Construir query string para Supabase
-    let query = `${process.env.SUPABASE_URL}/rest/v1/consultas?select=crm,uf,especialidade,query,tipo,fonte_internacional,criado_em&limit=${limit}&order=criado_em.desc`;
+    let query = `${process.env.SUPABASE_URL}/rest/v1/consultas?select=crm,uf,especialidade,query,tipo,fonte_internacional,medicamentos,criado_em&limit=${limit}&order=criado_em.desc`;
 
     if (uf)   query += `&uf=eq.${encodeURIComponent(uf)}`;
     if (esp)  query += `&especialidade=eq.${encodeURIComponent(esp)}`;
@@ -61,6 +61,44 @@ export default async function handler(req) {
       por_esp[r.especialidade] = (por_esp[r.especialidade] || 0) + 1;
     });
 
+    // Por medicamento — dado estratégico para monetização
+    const por_med = {};
+    rows.forEach(r => {
+      if (!r.medicamentos) return;
+      const meds = Array.isArray(r.medicamentos) ? r.medicamentos : [r.medicamentos];
+      meds.forEach(m => {
+        if (!m) return;
+        const nome = String(m).trim();
+        if (nome) por_med[nome] = (por_med[nome] || 0) + 1;
+      });
+    });
+
+    // Medicamentos por especialidade
+    const med_por_esp = {};
+    rows.forEach(r => {
+      if (!r.medicamentos || !r.especialidade) return;
+      if (!med_por_esp[r.especialidade]) med_por_esp[r.especialidade] = {};
+      const meds = Array.isArray(r.medicamentos) ? r.medicamentos : [r.medicamentos];
+      meds.forEach(m => {
+        if (!m) return;
+        const nome = String(m).trim();
+        if (nome) med_por_esp[r.especialidade][nome] = (med_por_esp[r.especialidade][nome] || 0) + 1;
+      });
+    });
+
+    // Medicamentos por UF
+    const med_por_uf = {};
+    rows.forEach(r => {
+      if (!r.medicamentos || !r.uf) return;
+      if (!med_por_uf[r.uf]) med_por_uf[r.uf] = {};
+      const meds = Array.isArray(r.medicamentos) ? r.medicamentos : [r.medicamentos];
+      meds.forEach(m => {
+        if (!m) return;
+        const nome = String(m).trim();
+        if (nome) med_por_uf[r.uf][nome] = (med_por_uf[r.uf][nome] || 0) + 1;
+      });
+    });
+
     // Série temporal (por dia)
     const por_dia = {};
     rows.forEach(r => {
@@ -75,6 +113,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({
       total, medicos, estados, pct_pcdt, pct_intl,
       por_uf, por_esp, por_dia,
+      por_med, med_por_esp, med_por_uf,
       rows_recentes: rows.slice(0, 50), // só as 50 mais recentes para a tabela preview
     }), {
       status: 200,

@@ -157,12 +157,58 @@ function saveSession(q, tipo) {
 }
 
 // ── LOG QUERY (Supabase via Edge Function) ──
-async function logQ(q, tipo, intl) {
+function extrairMedicamentos(resposta) {
+  const meds = [];
+  // Lista de medicamentos conhecidos
+  const medsList = [
+    'Adalimumabe','Etanercepte','Infliximabe','Certolizumabe','Golimumabe',
+    'Abatacepte','Tocilizumabe','Rituximabe','Belimumabe','Anifrolumabe',
+    'Baricitinibe','Tofacitinibe','Upadacitinibe','Secuquinumabe','Ixequizumabe',
+    'Ustecinumabe','Guselcumabe','Rissanquizumabe','Natalizumabe','Ocrelizumabe',
+    'Ofatumumabe','Fingolimode','Dimetilfumarato','Teriflunomida','Alentuzumabe',
+    'Cladribina','Nusinersena','Risdiplam','Onasemnogene','Mepolizumabe',
+    'Benralizumabe','Dupilumabe','Omalizumabe','Sacubitril','Dapagliflozina',
+    'Empagliflozina','Evolocumabe','Tafamidis','Patisirana','Vutrisirana',
+    'Trastuzumabe','Pertuzumabe','Palbociclibe','Ribociclibe','Abemaciclibe',
+    'Olaparibe','Enzalutamida','Abiraterona','Darolutamida','Bevacizumabe',
+    'Cetuximabe','Bortezomibe','Lenalidomida','Daratumumabe','Pomalidomida',
+    'Voxelotor','Crizanlizumabe','Hidroxiureia','Emicizumabe','Vedolizumabe',
+    'Risanquizumabe','Dupilumabe','Denosumabe','Teriparatida','Romosozumabe',
+    'Liraglutida','Semaglutida','Ivabradina','Canabidiol','Lacosamida','Perampanel',
+    'Budesonida','Fluticasona','Beclometasona','Formoterol','Umeclidínio',
+    'Vilanterol','Glicopirrônio','Roflumilaste','Sofosbuvir','Velpatasvir',
+    'Glecaprevir','Pibrentasvir','Dolutegravir','Tenofovir','Cabotegravir',
+    'Rilpivirina','Bedaquilina','Linezolida','Clofazimina','Imiglicerase',
+    'Agalsidase','Migalastate','Alglicosidase','Avalglicosidase','Laronidase',
+    'Octreotida','Lanreotida','Pasireotida','Pegvisomanto','Leuprorrelina',
+    'Icatibanto','Lanadelumabe','Deferasirox','Azacitidina','Eltrombopague',
+    'Romiplostim','Ranibizumabe','Aflibercept','Bevacizumabe','Apixabana',
+    'Rivaroxabana','Dabigatrana',
+    // Combinações DPOC
+    'Furoato de Fluticasona','Dipropionato de Beclometasona',
+  ];
+  
+  const respostaUpper = resposta;
+  medsList.forEach(med => {
+    if (resposta.toLowerCase().includes(med.toLowerCase()) && !meds.includes(med)) {
+      meds.push(med);
+    }
+  });
+  
+  return meds.slice(0, 10); // máximo 10 medicamentos por consulta
+}
+
+async function logQ(q, tipo, intl, resposta = '') {
   try {
+    const medicamentos = resposta ? extrairMedicamentos(resposta) : [];
     await fetch(API.log, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ crm: user.crm, uf: user.uf, esp: user.esp, query: q.slice(0, 100), tipo, intl }),
+      body: JSON.stringify({ 
+        crm: user.crm, uf: user.uf, esp: user.esp, 
+        query: q.slice(0, 100), tipo, intl,
+        medicamentos: medicamentos.length ? medicamentos : null
+      }),
     });
     document.getElementById('sync').textContent = 'Sincronizado ✓';
   } catch {
@@ -996,7 +1042,7 @@ async function send() {
 
     intl = /internacional|aha |esc |acc |eular|kdigo|nice |uptodate/i.test(fullAns);
     conv.push({ role: 'assistant', content: fullAns });
-    if (conv.length === 2) { saveSession(txt, intl ? 'i' : tipo); logQ(txt, tipo, intl); }
+    if (conv.length === 2) { saveSession(txt, intl ? 'i' : tipo); logQ(txt, tipo, intl, fullAns); }
     try { document.getElementById('sync').textContent = 'Sincronizado ✓'; } catch {}
 
   } catch (e) {
@@ -1200,6 +1246,56 @@ function renderAn(d) {
   ];
   const sm = Math.max(...srcs.map(s => s.n), 1);
   document.getElementById('an-src').innerHTML = srcs.map(s => `<div class="bar"><div class="bl">${s.l}</div><div class="bt"><div class="bf" style="width:${Math.round(s.n / sm * 100)}%"></div></div><div class="bv">${s.n}</div></div>`).join('');
+
+  // Medicamentos mais pesquisados
+  const medEl = document.getElementById('an-meds');
+  if (medEl && d.por_med) {
+    const topMeds = Object.entries(d.por_med).sort((a,b) => b[1]-a[1]).slice(0,15);
+    const mxMed = topMeds[0]?.[1] || 1;
+    if (topMeds.length) {
+      medEl.innerHTML = topMeds.map(([m,v]) => `
+        <div class="bar">
+          <div class="bl" style="width:200px">${m}</div>
+          <div class="bt"><div class="bf" style="width:${Math.round(v/mxMed*100)}%"></div></div>
+          <div class="bv">${v}</div>
+        </div>`).join('');
+    } else {
+      medEl.innerHTML = '<p style="font-size:12px;color:var(--ink4)">Dados sendo coletados. Disponível após as primeiras consultas.</p>';
+    }
+  }
+
+  // Medicamentos por especialidade
+  const medEspEl = document.getElementById('an-meds-esp');
+  if (medEspEl && d.med_por_esp) {
+    const esps = Object.entries(d.med_por_esp).sort((a,b) => Object.keys(b[1]).length - Object.keys(a[1]).length).slice(0,6);
+    if (esps.length) {
+      medEspEl.innerHTML = esps.map(([esp, meds]) => {
+        const top3 = Object.entries(meds).sort((a,b) => b[1]-a[1]).slice(0,3);
+        return `<div class="med-esp-row">
+          <div class="med-esp-name">${esp}</div>
+          <div class="med-esp-pills">${top3.map(([m,v]) => `<span class="med-pill">${m} <strong>${v}</strong></span>`).join('')}</div>
+        </div>`;
+      }).join('');
+    } else {
+      medEspEl.innerHTML = '<p style="font-size:12px;color:var(--ink4)">Dados sendo coletados.</p>';
+    }
+  }
+
+  // Medicamentos por UF (top 5 estados)
+  const medUfEl = document.getElementById('an-meds-uf');
+  if (medUfEl && d.med_por_uf) {
+    const topUfs = Object.entries(d.med_por_uf)
+      .map(([uf, meds]) => ({ uf, total: Object.values(meds).reduce((a,b)=>a+b,0), topMed: Object.entries(meds).sort((a,b)=>b[1]-a[1])[0] }))
+      .sort((a,b) => b.total - a.total).slice(0,8);
+    if (topUfs.length) {
+      medUfEl.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="background:var(--ln2)"><th style="padding:5px;text-align:left">UF</th><th style="padding:5px">Consultas</th><th style="padding:5px;text-align:left">Med. mais pesquisado</th></tr></thead>
+        <tbody>${topUfs.map(r => `<tr><td style="padding:5px;font-weight:700;color:var(--teal)">${r.uf}</td><td style="padding:5px;text-align:center">${r.total}</td><td style="padding:5px;color:var(--ink2)">${r.topMed ? r.topMed[0] : '—'} ${r.topMed ? '<span style="color:var(--ink4)">(' + r.topMed[1] + 'x)</span>' : ''}</td></tr>`).join('')}</tbody>
+      </table>`;
+    } else {
+      medUfEl.innerHTML = '<p style="font-size:12px;color:var(--ink4)">Dados sendo coletados.</p>';
+    }
+  }
 }
 
 // ── EXPORT ──
