@@ -373,8 +373,16 @@ tr:hover td{background:var(--ln3);}
   <div class="ob-live"><div class="pls"></div><span>Banco de dados Supabase ativo — dados sincronizados em tempo real</span></div>
   <div class="ob-warn">⚠️ <strong>Exclusivo para profissionais de saúde.</strong> Não substitui protocolos originais nem o julgamento clínico. Os dados são anonimizados para fins epidemiológicos.</div>
   <div class="ob-g">
-    <div class="fld"><label>Nome</label><input id="onome" placeholder="Dr(a). Nome Sobrenome"/></div>
-    <div class="fld"><label>CRM</label><input id="ocrm" placeholder="000000"/></div>
+    <div class="fld"><label>Nome</label><input id="onome" placeholder="Nome completo"/></div>
+    <div class="fld">
+      <label>Tipo de registro</label>
+      <select id="otipo" onchange="atualizarTipoRegistro()" style="padding:9px 11px;border:1.5px solid var(--ln);border-radius:var(--rs);font-family:'Plus Jakarta Sans',sans-serif;font-size:13.5px;color:var(--ink);background:var(--wh);outline:none;-webkit-appearance:none;">
+        <option value="CRM">CRM — Médico(a)</option>
+        <option value="RMS">RMS — Mais Médicos (estrangeiro)</option>
+        <option value="COREN">COREN — Enfermeiro(a)</option>
+      </select>
+    </div>
+    <div class="fld"><label id="lbl-registro">Número do CRM</label><input id="ocrm" placeholder="000000"/></div>
     <div class="fld"><label>UF</label>
       <select id="ouf"><option value="">Estado...</option>
         <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
@@ -393,6 +401,11 @@ tr:hover td{background:var(--ln3);}
         <option>Nefrologia</option><option>Infectologia</option><option>Psiquiatria</option>
         <option>Pediatria</option><option>Ginecologia e Obstetrícia</option><option>Hematologia</option>
         <option>Ortopedia</option><option>Medicina de Família</option><option>Geriatria</option>
+        <option>Medicina do Trabalho</option><option>Medicina de Emergência</option>
+        <option>── Enfermagem ──</option>
+        <option>Enfermagem Geral</option><option>Enfermagem em UTI</option>
+        <option>Enfermagem Oncológica</option><option>Enfermagem em Saúde Mental</option>
+        <option>Enfermagem Pediátrica</option><option>Enfermagem Obstétrica</option>
         <option>Outra</option>
       </select>
     </div>

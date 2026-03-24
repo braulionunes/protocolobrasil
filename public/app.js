@@ -59,11 +59,14 @@ const sl = ms => new Promise(r => setTimeout(r, ms));
 function entrar() {
   const n = gi('onome'), c = gi('ocrm'), u = gi('ouf'), e = gi('oesp');
   if (!n || !c || !u || !e) { toast('Preencha todos os campos.', ''); return; }
-  user = { nome: n, crm: c, uf: u, esp: e };
-  const ini = n.replace(/^Dr[a]?\.?\s*/i, '').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase();
+  const tipo = gi('otipo') || 'CRM';
+  user = { nome: n, crm: c, uf: u, esp: e, tipo_registro: tipo };
+  const prefixoNome = tipo === 'COREN' ? /^Enf[a]?\.?\s*/i : /^Dr[a]?\.?\s*/i;
+  const ini = n.replace(prefixoNome, '').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase();
   document.getElementById('uav').textContent  = ini;
-  document.getElementById('ulbl').textContent = `CRM-${u} ${c}`;
-  document.getElementById('wcn').textContent  = n.replace(/^Dr[a]?\.?\s*/i, '').split(' ')[0];
+  document.getElementById('ulbl').textContent = `${tipo}-${u} ${c}`;
+  const prefixo = tipo === 'COREN' ? /^Enf[a]?\.?\s*/i : /^Dr[a]?\.?\s*/i;
+  document.getElementById('wcn').textContent = n.replace(prefixo, '').split(' ')[0];
   document.getElementById('ob').classList.remove('show');
   myHist = lsGet(`pb_hist_${c}`) || [];
   renderH(myHist);
@@ -73,6 +76,26 @@ function entrar() {
   toast('Bem-vindo(a), ' + n.replace(/^Dr[a]?\.?\s*/i,'').split(' ')[0] + '!', 'ok');
 }
 function gi(id) { return (document.getElementById(id)?.value || '').trim(); }
+
+function atualizarTipoRegistro() {
+  const tipo = gi('otipo');
+  const lbl = document.getElementById('lbl-registro');
+  const inp = document.getElementById('ocrm');
+  const nomePlaceholder = document.getElementById('onome');
+  if (tipo === 'CRM') {
+    lbl.textContent = 'Número do CRM';
+    inp.placeholder = '000000';
+    nomePlaceholder.placeholder = 'Dr(a). Nome Sobrenome';
+  } else if (tipo === 'RMS') {
+    lbl.textContent = 'Número do RMS';
+    inp.placeholder = 'RMS-000000';
+    nomePlaceholder.placeholder = 'Dr(a). Nome Sobrenome';
+  } else if (tipo === 'COREN') {
+    lbl.textContent = 'Número do COREN';
+    inp.placeholder = 'COREN-000000';
+    nomePlaceholder.placeholder = 'Enf(a). Nome Sobrenome';
+  }
+}
 
 // ── ADMIN AUTH ──
 // Para trocar a senha: gere o SHA256 da sua senha em: https://emn178.github.io/online-tools/sha256.html
@@ -360,6 +383,7 @@ Responda SOMENTE com JSON válido, sem texto antes ou depois:
 }
 
 function gerarLMEpdf(d) {
+  window._lmeData = d; // store for relatório and receita
   const hoje = new Date().toLocaleDateString('pt-BR');
 
   // Remove existing LME modal if present
@@ -639,8 +663,162 @@ function gerarLMEpdf(d) {
 
   document.body.appendChild(modal);
 
-  // Show confirmation in chat
-  addAI('✅ **Rascunho do LME gerado!** O formulário apareceu na tela. Preencha os campos em amarelo, assine e entregue ao paciente.\\n\\n📋 Campos pré-preenchidos: CID-10, diagnóstico, medicamento, anamnese e critérios do PCDT.\\n⚠️ Campos que precisam ser completados: nome do paciente, peso, altura, CNES, CNS do médico e assinatura.');
+  // Add buttons to open report and prescription
+  const btnsDoc = document.createElement('div');
+  btnsDoc.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding:10px 14px;border-top:1px solid var(--ln);background:#f8fcfc;';
+  btnsDoc.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--teal);width:100%;margin-bottom:4px">📦 Outros documentos do pacote CEAF:</div>
+    <button onclick="gerarRelatorioMedico(window._lmeData)" style="padding:7px 14px;background:#EBF9F8;border:1.5px solid var(--teal2);border-radius:8px;font-size:12px;font-weight:600;color:var(--teal);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">📄 Relatório Médico</button>
+    <button onclick="gerarReceita(window._lmeData)" style="padding:7px 14px;background:#EBF9F8;border:1.5px solid var(--teal2);border-radius:8px;font-size:12px;font-weight:600;color:var(--teal);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">📋 Receita (2 vias)</button>
+  `;
+  document.getElementById('lme-modal')?.querySelector('#lme-form')?.after(btnsDoc) || 
+  document.getElementById('lme-modal')?.appendChild(btnsDoc);
+
+  addAI('✅ **Pacote de documentos CEAF gerado!**\n\n📋 **LME** — formulário apareceu na tela\n📄 **Relatório Médico** — clique no botão abaixo do LME\n📋 **Receita em 2 vias** — clique no botão abaixo do LME\n\n⚠️ Preencha os campos em amarelo antes de imprimir e assinar.');
+}
+
+function gerarRelatorioMedico(d) {
+  if (!d) { toast('Gere o LME primeiro.', ''); return; }
+  const hoje = new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  const existing = document.getElementById('rel-modal'); if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'rel-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:803;background:rgba(0,0,0,0.65);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;';
+  modal.innerHTML = `<div style="background:white;width:min(700px,98%);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);font-family:Arial,sans-serif;">
+    <div style="background:#004D43;color:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-family:'Plus Jakarta Sans',sans-serif;">
+      <div style="font-size:13px;font-weight:700">📄 Relatório Médico — ProtocoloBrasil</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('rel-modal').querySelector('iframe').contentWindow.print()" style="padding:6px 14px;background:#18C4B0;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir</button>
+        <button onclick="document.getElementById('rel-modal').remove()" style="padding:6px 14px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">✕ Fechar</button>
+      </div>
+    </div>
+    <iframe style="width:100%;height:620px;border:none;"></iframe>
+  </div>`;
+  document.body.appendChild(modal);
+  const tratPrev = d.tratamento_previo && !d.tratamento_previo.toLowerCase().startsWith('n') ? d.tratamento_previo : '';
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>
+@page{size:A4;margin:22mm 18mm;}
+body{font-family:Arial,sans-serif;font-size:11px;color:#000;line-height:1.6;margin:0;}
+.hdr{text-align:center;border-bottom:2px solid #004D43;padding-bottom:10px;margin-bottom:14px;}
+.hdr h1{font-size:15px;color:#004D43;margin:3px 0;}
+.hdr p{font-size:9.5px;color:#555;margin:2px 0;}
+.sec{font-size:9.5px;font-weight:700;color:#004D43;text-transform:uppercase;margin:12px 0 6px;border-bottom:1px solid #004D43;padding-bottom:2px;}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.fld{margin-bottom:8px;}
+.fld label{font-size:8.5px;color:#666;text-transform:uppercase;font-weight:700;display:block;margin-bottom:2px;}
+input{width:100%;border:none;border-bottom:1px solid #aaa;font-size:10.5px;outline:none;font-family:Arial;padding:1px 0;}
+.edit{background:#fffde7;}
+textarea{width:100%;border:1px solid #ccc;border-radius:3px;padding:5px;font-size:10.5px;font-family:Arial;resize:vertical;outline:none;box-sizing:border-box;}
+.decl{margin-top:14px;background:#f0faf8;border:1px solid #004D43;border-radius:3px;padding:7px 10px;font-size:9.5px;color:#004D43;}
+.assin{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
+.assin-box{border-top:1px solid #000;padding-top:5px;text-align:center;font-size:9px;margin-top:24px;}
+.warn{background:#fff3cd;border-radius:3px;padding:5px 8px;font-size:9px;color:#856404;}
+.foot{margin-top:12px;font-size:8.5px;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:5px;}
+@media print{button,.warn{display:none;}}
+</style></head><body>
+<div class="hdr"><h1>RELATÓRIO MÉDICO</h1><p>Apoio à solicitação de medicamento — Componente Especializado da Assistência Farmacêutica (CEAF/SUS)</p></div>
+<div class="sec">1. Identificação do Profissional</div>
+<div class="r3">
+  <div class="fld"><label>Nome do médico *</label><input class="edit" placeholder="Nome completo"></div>
+  <div class="fld"><label>${user.tipo_registro||'CRM'}/RMS/COREN *</label><input class="edit" placeholder="Número"></div>
+  <div class="fld"><label>Especialidade</label><input value="${user.esp||''}"></div>
+</div>
+<div class="r2">
+  <div class="fld"><label>Estabelecimento (CNES)</label><input class="edit" placeholder="Nome — CNES 0000000"></div>
+  <div class="fld"><label>UF / Município</label><input value="${user.uf||''}"></div>
+</div>
+<div class="sec">2. Identificação do Paciente</div>
+<div class="r2">
+  <div class="fld"><label>Nome completo do paciente *</label><input class="edit" placeholder="Nome completo"></div>
+  <div class="fld"><label>Data de nascimento</label><input class="edit" placeholder="DD/MM/AAAA"></div>
+</div>
+<div class="r3">
+  <div class="fld"><label>CPF ou CNS *</label><input class="edit" placeholder="000.000.000-00"></div>
+  <div class="fld"><label>CID-10 *</label><input value="${d.cid10||''}"></div>
+  <div class="fld"><label>Diagnóstico *</label><input value="${d.diagnostico||''}"></div>
+</div>
+<div class="sec">3. Histórico Clínico</div>
+<div class="fld"><label>Anamnese e evolução clínica *</label><textarea rows="4">${d.anamnese||''}</textarea></div>
+<div class="fld"><label>Tratamentos prévios (nome, dose, duração, resposta terapêutica) *</label><textarea rows="3">${tratPrev||'Descrever tratamentos anteriores realizados, dose utilizada, duração e motivo da troca ou falha terapêutica'}</textarea></div>
+<div class="sec">4. Medicamento Solicitado e Justificativa</div>
+<div class="r2">
+  <div class="fld"><label>Medicamento (nome genérico, dose, forma) *</label><input value="${d.medicamento1||''}"></div>
+  <div class="fld"><label>Posologia *</label><input class="edit" placeholder="Ex: 40mg SC a cada 2 semanas"></div>
+</div>
+<div class="fld"><label>Justificativa — critérios do PCDT atendidos *</label><textarea rows="3">${d.observacoes||'Descrever os critérios do PCDT vigente que o paciente preenche para receber este medicamento'}</textarea></div>
+<div class="sec">5. Exames e Documentos</div>
+<div class="fld"><label>Exames realizados (com datas e resultados)</label><textarea rows="3" placeholder="Ex:
+- Espirometria (DD/MM/AAAA): VEF1/CVF 0,65, VEF1 42%
+- Hemograma (DD/MM/AAAA): eosinófilos 380/μL
+- Rx tórax (DD/MM/AAAA): sem alterações"></textarea></div>
+<div class="fld"><label>Documentos obrigatórios a anexar (conforme PCDT)</label><textarea rows="2">${d.documentos ? d.documentos.split(';').filter(x=>x.trim()).map((doc,i)=>(i+1)+'. '+doc.trim()).join('\n') : 'Listar documentos obrigatórios conforme PCDT vigente'}</textarea></div>
+<div class="decl">Declaro que as informações acima são verídicas, que o paciente foi devidamente avaliado e que preenche os critérios estabelecidos pelo PCDT vigente para uso do medicamento solicitado.</div>
+<div class="assin">
+  <div><div class="assin-box">Assinatura e carimbo do profissional</div><div style="text-align:center;font-size:9px;margin-top:4px">Data: ____/____/_______</div></div>
+  <div class="warn">⚠️ RASCUNHO ProtocoloBrasil — Verifique todos os campos antes de assinar. Consulte a portaria original em gov.br/saude/pcdt. Gerado em ${hoje}.</div>
+</div>
+<div class="foot">ProtocoloBrasil v1.0 · Apoio à Decisão Clínica · Dados anonimizados · LGPD</div>
+</body></html>`;
+  modal.querySelector('iframe').srcdoc = html;
+}
+
+function gerarReceita(d) {
+  if (!d) { toast('Gere o LME primeiro.', ''); return; }
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const existing = document.getElementById('rec-modal'); if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'rec-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:804;background:rgba(0,0,0,0.65);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;';
+  modal.innerHTML = `<div style="background:white;width:min(580px,98%);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+    <div style="background:#004D43;color:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-family:'Plus Jakarta Sans',sans-serif;">
+      <div style="font-size:13px;font-weight:700">📋 Receita em 2 Vias — ProtocoloBrasil</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('rec-modal').querySelector('iframe').contentWindow.print()" style="padding:6px 14px;background:#18C4B0;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir 2 vias</button>
+        <button onclick="document.getElementById('rec-modal').remove()" style="padding:6px 14px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">✕ Fechar</button>
+      </div>
+    </div>
+    <iframe style="width:100%;height:520px;border:none;"></iframe>
+  </div>`;
+  document.body.appendChild(modal);
+  const via = (n) => `<div style="border:1px solid #999;border-radius:5px;padding:12px 14px;font-family:Arial;font-size:10.5px;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+      <div><strong style="font-size:12px;color:#004D43">RECEITA MÉDICA</strong><br><span style="font-size:8.5px;color:#666">CEAF/SUS — Via ${n}ª de 2</span></div>
+      <div style="font-size:9px;color:#666;text-align:right">Data: ${hoje}<br>Válida por 90 dias</div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-bottom:6px;">
+      <div><strong>Paciente:</strong><br><input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:10px;outline:none;font-family:Arial;" placeholder="Nome completo do paciente"></div>
+      <div><strong>CPF/CNS:</strong><br><input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:10px;outline:none;font-family:Arial;" placeholder="000.000.000-00"></div>
+    </div>
+    <div style="margin-bottom:4px;font-size:10px;"><strong>Diagnóstico:</strong> ${d.cid10||''} — ${d.diagnostico||''}</div>
+    <div style="border:1px solid #ddd;border-radius:3px;padding:8px;margin:6px 0;min-height:70px;background:#fafafa;">
+      <div style="font-weight:700;font-size:10px;color:#004D43;margin-bottom:4px;">Rp.</div>
+      <div style="margin-bottom:3px;"><strong>1.</strong> ${d.medicamento1||'_______________________'}</div>
+      ${d.medicamento2 ? `<div style="margin-bottom:3px;"><strong>2.</strong> ${d.medicamento2}</div>` : ''}
+      <div style="margin-top:5px;font-size:9.5px;color:#444;">Qtd: ${d.qtd_mensal||'______'}/mês × 6 meses (dispensação semestral CEAF)</div>
+    </div>
+    <div style="margin-bottom:8px;font-size:10px;"><strong>Posologia:</strong> <input style="border:none;border-bottom:1px solid #aaa;background:#fffde7;width:75%;font-size:10px;outline:none;font-family:Arial;" placeholder="Conforme orientação — ver bula e portaria"></div>
+    <div style="font-size:8.5px;background:#fff3cd;padding:3px 6px;border-radius:2px;margin-bottom:8px;">⚠️ Uso exclusivo CEAF/SUS. Apresentar com LME e documentos obrigatórios.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
+      <div style="font-size:9.5px;">
+        <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9.5px;outline:none;font-family:Arial;margin-bottom:3px;" placeholder="Nome do profissional">
+        <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9.5px;outline:none;font-family:Arial;" placeholder="${user.tipo_registro||'CRM'}/COREN/RMS — número — UF">
+      </div>
+      <div style="border-top:1px solid #000;padding-top:4px;text-align:center;font-size:8.5px;">Assinatura e carimbo</div>
+    </div>
+  </div>`;
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+@page{size:A4;margin:15mm;}
+body{font-family:Arial;margin:0;padding:0;}
+.divider{border:none;border-top:2px dashed #bbb;margin:10px 0;position:relative;text-align:center;}
+.divider::after{content:"✂ recortar";position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:white;padding:0 8px;font-size:8px;color:#bbb;}
+input{font-family:Arial;}
+@media print{.no-print{display:none;}}
+</style></head><body>
+${via(1)}<hr class="divider">${via(2)}
+<div class="no-print" style="text-align:center;margin-top:8px;font-size:9px;color:#aaa;">RASCUNHO ProtocoloBrasil · ${hoje}</div>
+</body></html>`;
+  modal.querySelector('iframe').srcdoc = html;
 }
 
 function imprimirLME() {
