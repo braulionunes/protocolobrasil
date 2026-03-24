@@ -770,81 +770,361 @@ function gerarReceita(d) {
   const modal = document.createElement('div');
   modal.id = 'rec-modal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:804;background:rgba(0,0,0,0.65);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;';
-  modal.innerHTML = `<div style="background:white;width:min(580px,98%);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+  modal.innerHTML = `<div style="background:white;width:min(620px,98%);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
     <div style="background:#004D43;color:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-family:'Plus Jakarta Sans',sans-serif;">
-      <div style="font-size:13px;font-weight:700">📋 Receita em 2 Vias — ProtocoloBrasil</div>
+      <div style="font-size:13px;font-weight:700">📋 Receita Médica em 2 Vias</div>
       <div style="display:flex;gap:8px">
-        <button onclick="document.getElementById('rec-modal').querySelector('iframe').contentWindow.print()" style="padding:6px 14px;background:#18C4B0;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir 2 vias</button>
+        <button onclick="document.getElementById('rec-modal').querySelector('iframe').contentWindow.print()" style="padding:6px 14px;background:#18C4B0;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir (2 páginas)</button>
         <button onclick="document.getElementById('rec-modal').remove()" style="padding:6px 14px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">✕ Fechar</button>
       </div>
     </div>
-    <iframe style="width:100%;height:520px;border:none;"></iframe>
+    <iframe style="width:100%;height:560px;border:none;"></iframe>
   </div>`;
   document.body.appendChild(modal);
-  const via = (n) => `<div style="border:1px solid #999;border-radius:5px;padding:12px 14px;font-family:Arial;font-size:10.5px;">
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <div><strong style="font-size:12px;color:#004D43">RECEITA MÉDICA</strong><br><span style="font-size:8.5px;color:#666">CEAF/SUS — Via ${n}ª de 2</span></div>
-      <div style="font-size:9px;color:#666;text-align:right">Data: ${hoje}<br>Válida por 90 dias</div>
+
+  // Each via is a full A4 page — separated by page-break
+  const viaHTML = (n) => `
+<div class="via">
+  <div class="via-header">
+    <div>
+      <div class="titulo">RECEITA MÉDICA</div>
+      <div class="subtitulo">Componente Especializado da Assistência Farmacêutica — CEAF/SUS</div>
+      <div class="subtitulo" style="color:#c00;font-weight:700">Via ${n}ª de 2 — ${n===1?'Farmácia (reter)':'Paciente (conservar)'}</div>
     </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-bottom:6px;">
-      <div><strong>Paciente:</strong><br><input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:10px;outline:none;font-family:Arial;" placeholder="Nome completo do paciente"></div>
-      <div><strong>CPF/CNS:</strong><br><input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:10px;outline:none;font-family:Arial;" placeholder="000.000.000-00"></div>
+    <div style="text-align:right;font-size:9px;color:#555;">
+      Data: <strong>${hoje}</strong><br>
+      Validade: 90 dias
     </div>
-    <div style="margin-bottom:4px;font-size:10px;"><strong>Diagnóstico:</strong> ${d.cid10||''} — ${d.diagnostico||''}</div>
-    <div style="border:1px solid #ddd;border-radius:3px;padding:8px;margin:6px 0;min-height:70px;background:#fafafa;">
-      <div style="font-weight:700;font-size:10px;color:#004D43;margin-bottom:4px;">Rp.</div>
-      <div style="margin-bottom:3px;"><strong>1.</strong> ${d.medicamento1||'_______________________'}</div>
-      ${d.medicamento2 ? `<div style="margin-bottom:3px;"><strong>2.</strong> ${d.medicamento2}</div>` : ''}
-      <div style="margin-top:5px;font-size:9.5px;color:#444;">Qtd: ${d.qtd_mensal||'______'}/mês × 6 meses (dispensação semestral CEAF)</div>
+  </div>
+
+  <div class="secao">DADOS DO PACIENTE</div>
+  <div class="grid2">
+    <div class="campo"><label>Nome completo do paciente *</label><input class="edit" placeholder="Nome completo"></div>
+    <div class="campo"><label>CPF ou CNS *</label><input class="edit" placeholder="000.000.000-00"></div>
+  </div>
+  <div class="grid3">
+    <div class="campo"><label>Data de nascimento</label><input class="edit" placeholder="DD/MM/AAAA"></div>
+    <div class="campo"><label>CID-10</label><input value="${d.cid10||''}"></div>
+    <div class="campo"><label>Diagnóstico</label><input value="${d.diagnostico||''}"></div>
+  </div>
+
+  <div class="secao">PRESCRIÇÃO</div>
+  <div class="rp-box">
+    <div class="rp-label">Rp.</div>
+    <div class="rp-item"><strong>1.</strong> ${d.medicamento1||'_________________________________'}</div>
+    ${d.medicamento2 ? `<div class="rp-item"><strong>2.</strong> ${d.medicamento2}</div>` : ''}
+    <div class="rp-qtd">Quantidade: ${d.qtd_mensal||'______'} / mês × 6 meses (dispensação semestral no CEAF)</div>
+  </div>
+  <div class="campo" style="margin-top:8px;">
+    <label>Posologia e modo de usar *</label>
+    <input class="edit" placeholder="Ex: 1 inalação 1x/dia pela manhã — conforme orientação médica e bula">
+  </div>
+
+  <div class="aviso">⚠️ Medicamento de uso exclusivo no CEAF/SUS. Apresentar esta receita junto ao LME, relatório médico e demais documentos obrigatórios conforme PCDT vigente.</div>
+
+  <div class="secao">MÉDICO SOLICITANTE</div>
+  <div class="grid2">
+    <div class="campo"><label>Nome do médico *</label><input class="edit" placeholder="Nome completo do médico"></div>
+    <div class="campo"><label>CRM — número — UF *</label><input class="edit" placeholder="Ex: CRM 123456 SP"></div>
+  </div>
+  <div class="grid2">
+    <div class="campo"><label>Especialidade</label><input value="${user.esp||''}"></div>
+    <div class="campo"><label>Estabelecimento (CNES)</label><input class="edit" placeholder="Nome — CNES 0000000"></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;align-items:end;">
+    <div>
+      <div style="height:35px;border-bottom:1px solid #000;"></div>
+      <div style="text-align:center;font-size:9px;margin-top:3px;">Assinatura e carimbo do médico</div>
     </div>
-    <div style="margin-bottom:8px;font-size:10px;"><strong>Posologia:</strong> <input style="border:none;border-bottom:1px solid #aaa;background:#fffde7;width:75%;font-size:10px;outline:none;font-family:Arial;" placeholder="Conforme orientação — ver bula e portaria"></div>
-    <div style="font-size:8.5px;background:#fff3cd;padding:3px 6px;border-radius:2px;margin-bottom:8px;">⚠️ Uso exclusivo CEAF/SUS. Apresentar com LME e documentos obrigatórios.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
-      <div style="font-size:9.5px;">
-        <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9.5px;outline:none;font-family:Arial;margin-bottom:3px;" placeholder="Nome do profissional">
-        <input style="width:100%;border:none;border-bottom:1px solid #aaa;background:#fffde7;font-size:9.5px;outline:none;font-family:Arial;" placeholder="${user.tipo_registro||'CRM'}/COREN/RMS — número — UF">
-      </div>
-      <div style="border-top:1px solid #000;padding-top:4px;text-align:center;font-size:8.5px;">Assinatura e carimbo</div>
+    <div style="font-size:8.5px;color:#856404;background:#fff3cd;border-radius:3px;padding:6px 8px;">
+      ⚠️ RASCUNHO ProtocoloBrasil · Verifique todos os dados antes de assinar · ${hoje}
     </div>
-  </div>`;
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-@page{size:A4;margin:15mm;}
-body{font-family:Arial;margin:0;padding:0;}
-.divider{border:none;border-top:2px dashed #bbb;margin:10px 0;position:relative;text-align:center;}
-.divider::after{content:"✂ recortar";position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:white;padding:0 8px;font-size:8px;color:#bbb;}
-input{font-family:Arial;}
-@media print{.no-print{display:none;}}
+  </div>
+</div>`;
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<style>
+@page { size: A4; margin: 18mm 16mm; }
+body { font-family: Arial, sans-serif; font-size: 10px; color: #000; margin: 0; padding: 0; }
+.via { page-break-after: always; break-after: page; min-height: calc(297mm - 36mm); box-sizing: border-box; padding-bottom: 10mm; }
+.via:last-child { page-break-after: avoid; break-after: avoid; }
+.via-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #004D43; padding-bottom: 8px; margin-bottom: 10px; }
+.titulo { font-size: 14px; font-weight: 700; color: #004D43; }
+.subtitulo { font-size: 8.5px; color: #555; margin-top: 1px; }
+.secao { font-size: 8.5px; font-weight: 700; color: #004D43; text-transform: uppercase; border-bottom: 1px solid #004D43; padding-bottom: 2px; margin: 10px 0 6px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+.campo label { display: block; font-size: 8px; color: #666; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+input { width: 100%; border: none; border-bottom: 1px solid #aaa; font-size: 10px; outline: none; font-family: Arial; padding: 1px 0; box-sizing: border-box; }
+.edit { background: #fffde7; }
+.rp-box { border: 1px solid #ccc; border-radius: 4px; padding: 8px 10px; background: #fafafa; min-height: 65px; }
+.rp-label { font-weight: 700; font-size: 10px; color: #004D43; margin-bottom: 4px; }
+.rp-item { margin-bottom: 4px; font-size: 10.5px; }
+.rp-qtd { margin-top: 6px; font-size: 9px; color: #555; }
+.aviso { background: #fff3cd; border-radius: 3px; padding: 5px 8px; font-size: 8.5px; color: #856404; margin: 8px 0; }
+@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style></head><body>
-${via(1)}<hr class="divider">${via(2)}
-<div class="no-print" style="text-align:center;margin-top:8px;font-size:9px;color:#aaa;">RASCUNHO ProtocoloBrasil · ${hoje}</div>
+${viaHTML(1)}${viaHTML(2)}
 </body></html>`;
+
   modal.querySelector('iframe').srcdoc = html;
 }
 
 function imprimirLME() {
-  const form = document.getElementById('lme-form');
-  if (!form) return;
-  const w = window.open('', '_blank');
-  if (!w) {
-    // Fallback if popup blocked — use print directly
-    const orig = document.body.innerHTML;
-    const toolbar = document.querySelector('#lme-modal > div > div:first-child');
-    const aviso = document.querySelector('#lme-modal > div > div:nth-child(2)');
-    if (toolbar) toolbar.style.display = 'none';
-    if (aviso) aviso.style.display = 'none';
-    window.print();
-    if (toolbar) toolbar.style.display = '';
-    if (aviso) aviso.style.display = '';
-    return;
-  }
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>LME</title>
-    <style>@page{size:A4;margin:10mm 12mm;}body{font-family:Arial,sans-serif;margin:0;padding:0;}
-    input,textarea{border:none;border-bottom:1px solid #aaa;outline:none;font-family:Arial;font-size:inherit;}
-    @media print{.no-print{display:none;}}</style></head>
-    <body>${form.innerHTML}<script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
-  w.document.close();
-}
+  const d = window._lmeData;
+  if (!d) { toast('Gere o LME primeiro.',''); return; }
+  const hoje = new Date().toLocaleDateString('pt-BR');
 
+  // Read current values from the form (user may have edited them)
+  const fv = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const rc = (name) => { const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : 'NAO'; };
+  
+  const cnes = fv('lme-cnes') || ''; 
+  const estab = fv('lme-estab') || '';
+  const paciente = fv('lme-paciente') || '';
+  const mae = fv('lme-mae') || '';
+  const peso = fv('lme-peso') || '00';
+  const altura = fv('lme-altura') || '000';
+  const med1 = fv('lme-med1') || d.medicamento1 || '';
+  const med2 = fv('lme-med2') || d.medicamento2 || '';
+  const qtd = fv('lme-qtd') || d.qtd_mensal || '30';
+  const cid = fv('lme-cid') || d.cid10 || '';
+  const diag = fv('lme-diag') || d.diagnostico || '';
+  const anamnese = fv('lme-anamnese') || d.anamnese || '';
+  const tratPrev = rc('tratprev');
+  const tratPrevTxt = fv('lme-tratprev-txt') || d.tratamento_previo || '';
+  const medico = fv('lme-medico') || user.nome || '';
+  const cnsMedico = fv('lme-cns-medico') || '';
+  const incapaz = rc('incapaz');
+  const responsavel = fv('lme-responsavel') || '';
+
+  const existing = document.getElementById('lme-print-modal');
+  if (existing) existing.remove();
+  const pm = document.createElement('div');
+  pm.id = 'lme-print-modal';
+  pm.style.cssText = 'position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.7);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;';
+  pm.innerHTML = `<div style="background:white;width:min(860px,98%);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+    <div style="background:#004D43;color:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;font-family:'Plus Jakarta Sans',sans-serif;">
+      <div style="font-size:13px;font-weight:700">🖨️ LME — Modelo Oficial MS</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('lme-print-modal').querySelector('iframe').contentWindow.print()" style="padding:6px 14px;background:#18C4B0;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+        <button onclick="document.getElementById('lme-print-modal').remove()" style="padding:6px 14px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">✕ Fechar</button>
+      </div>
+    </div>
+    <div style="background:#f0f0f0;padding:6px 12px;font-size:11px;color:#555;font-family:'Plus Jakarta Sans',sans-serif;">
+      💡 Ao imprimir: <strong>Tamanho A4 · Margens mínimas ou nenhuma · Escala 100%</strong>
+    </div>
+    <iframe style="width:100%;height:720px;border:none;background:white;"></iframe>
+  </div>`;
+  document.body.appendChild(pm);
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>LME — ${diag}</title>
+<style>
+@page { size: A4 portrait; margin: 7mm 8mm; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,Helvetica,sans-serif;font-size:7.5px;color:#000;background:white;}
+.page{width:100%;max-width:195mm;}
+/* Header */
+.sus-bar{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+.sus-logo{font-size:18px;font-weight:900;color:#1351B4;letter-spacing:-1px;}
+.sus-title{flex:1;}
+.sus-title h1{font-size:7px;text-transform:uppercase;font-weight:700;text-align:center;}
+.sus-title h2{font-size:7.5px;font-weight:700;text-align:center;text-transform:uppercase;margin-top:1px;}
+.sus-title h3{font-size:7px;text-align:center;margin-top:1px;}
+.lme-title{text-align:right;font-size:8px;font-weight:700;}
+/* Grid fields */
+.grid{display:grid;margin-bottom:1px;}
+.cell{border:0.5px solid #666;padding:2px 3px;min-height:14px;vertical-align:top;}
+.cell-lbl{font-size:6.5px;color:#333;display:block;margin-bottom:1px;font-weight:700;}
+.cell-val{font-size:7.5px;font-weight:600;min-height:8px;}
+.cell-input{width:100%;border:none;outline:none;font-family:Arial;font-size:7.5px;background:transparent;padding:0;}
+textarea.cell-input{resize:none;min-height:30px;display:block;overflow:hidden;}
+/* Rows */
+.row1{grid-template-columns:60px 1fr 1fr;}
+.row-peso{grid-template-columns:1fr 50px 50px;}
+.row-med{grid-template-columns:3fr 1fr 1fr 1fr 1fr 1fr 1fr;}
+.row-cid{grid-template-columns:80px 1fr;}
+.row3{grid-template-columns:1fr 1fr 1fr;}
+.row-doc{grid-template-columns:1fr 1fr 1fr 1fr;}
+/* Section headers */
+.sec{background:#000;color:#fff;font-size:6.5px;font-weight:700;text-transform:uppercase;padding:1px 3px;margin:2px 0 0;}
+/* Radio/Checkbox */
+.radio-group{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.radio-opt{display:flex;align-items:center;gap:2px;font-size:7.5px;}
+.rb{width:9px;height:9px;border:1px solid #555;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;}
+.rb.on::after{content:"";width:5px;height:5px;background:#000;border-radius:50%;display:block;}
+.cb{width:9px;height:9px;border:1px solid #555;display:inline-flex;align-items:center;justify-content:center;font-size:9px;}
+.cb.on::after{content:"✓";font-size:8px;color:#000;}
+/* Footer */
+.footer-bar{border:0.5px dashed #999;padding:3px 5px;margin-top:2px;font-size:6.5px;color:#555;text-align:center;}
+.docs-box{border:0.5px solid #1351B4;border-radius:2px;padding:3px 5px;background:#f0f4ff;margin-top:2px;}
+.docs-title{font-size:6.5px;font-weight:700;color:#1351B4;margin-bottom:2px;}
+.crit-box{border:0.5px solid #006B5E;border-radius:2px;padding:3px 5px;background:#f0faf8;margin-top:2px;}
+.crit-title{font-size:6.5px;font-weight:700;color:#006B5E;margin-bottom:2px;}
+.rascunho{background:#fff3cd;border:0.5px solid #ffc107;padding:2px 4px;font-size:6.5px;color:#856404;margin-top:2px;text-align:center;}
+@media print{.rascunho{display:block;} body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style></head><body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="sus-bar">
+  <div class="sus-logo">SUS</div>
+  <div class="sus-title">
+    <h1>Sistema Único de Saúde — Ministério da Saúde — Secretaria de Estado da Saúde</h1>
+    <h2>Componente Especializado da Assistência Farmacêutica<br>Laudo de Solicitação, Avaliação e Autorização de Medicamento(s)</h2>
+    <h3>Solicitação de Medicamento(s)</h3>
+  </div>
+  <div class="lme-title">LME</div>
+</div>
+<div style="font-size:6.5px;font-weight:700;text-align:center;border:0.5px solid #000;padding:1px;margin-bottom:2px;">CAMPOS DE PREENCHIMENTO EXCLUSIVO PELO MÉDICO SOLICITANTE</div>
+
+<!-- CAMPOS 1-2: CNES e Estabelecimento -->
+<div class="grid row1">
+  <div class="cell"><span class="cell-lbl">1- Número do CNES *</span><div class="cell-val">${cnes}</div></div>
+  <div class="cell" style="grid-column:span 2"><span class="cell-lbl">2- Nome do estabelecimento de saúde solicitante</span><div class="cell-val">${estab}</div></div>
+</div>
+
+<!-- CAMPO 3: Paciente + Peso + Altura -->
+<div class="grid row-peso">
+  <div class="cell"><span class="cell-lbl">3- Nome completo do Paciente *</span><div class="cell-val">${paciente}</div></div>
+  <div class="cell"><span class="cell-lbl">5- Peso *</span><div class="cell-val" style="font-size:11px;text-align:center;">${peso}<br><span style="font-size:7px;">kg</span></div></div>
+  <div class="cell"><span class="cell-lbl">6- Altura *</span><div class="cell-val" style="font-size:11px;text-align:center;">${altura}<br><span style="font-size:7px;">cm</span></div></div>
+</div>
+
+<!-- CAMPO 4: Mãe -->
+<div class="grid">
+  <div class="cell"><span class="cell-lbl">4- Nome da Mãe do Paciente *</span><div class="cell-val">${mae}</div></div>
+</div>
+
+<!-- CAMPO 7: Medicamentos -->
+<div class="sec">7- Medicamento(s) * &nbsp; 8- Quantidade Solicitada</div>
+<table style="width:100%;border-collapse:collapse;margin-bottom:1px;">
+  <thead>
+    <tr style="background:#eee;">
+      <th style="border:0.5px solid #666;padding:1px 2px;font-size:6.5px;width:18px;">#</th>
+      <th style="border:0.5px solid #666;padding:1px 2px;font-size:6.5px;">Medicamento (nome genérico, dose, forma farmacêutica)</th>
+      <th style="border:0.5px solid #666;padding:1px 2px;font-size:6.5px;width:35px;">1º mês</th>
+      <th style="border:0.5px solid #666;padding:1px 2px;font-size:6.5px;width:35px;">2º mês</th>
+      <th style="border:0.5px solid #666;padding:1px 2px;font-size:6.5px;width:35px;">3º mês</th>
+      <th style="border:0.5px solid #666;padding:1px 2px;font-size:6.5px;width:35px;">4º mês</th>
+      <th style="border:0.5px solid #666;padding:1px 2px;font-size:6.5px;width:35px;">5º mês</th>
+      <th style="border:0.5px solid #666;padding:1px 2px;font-size:6.5px;width:35px;">6º mês</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${[med1, med2, '', '', '', ''].map((m, i) => `<tr>
+      <td style="border:0.5px solid #666;padding:1px 2px;text-align:center;">${i+1}</td>
+      <td style="border:0.5px solid #666;padding:1px 2px;">${m}</td>
+      ${['','','','','',''].map(() => `<td style="border:0.5px solid #666;padding:1px 2px;text-align:center;">${m ? qtd.replace(/[^0-9]/g,'')+(qtd.includes('comprimid')||qtd.includes('cápsula')||qtd.includes('caps')?'':' un') : ''}</td>`).join('')}
+    </tr>`).join('')}
+  </tbody>
+</table>
+
+<!-- CAMPOS 9-10: CID e Diagnóstico -->
+<div class="grid row-cid">
+  <div class="cell"><span class="cell-lbl">9- CID-10 *</span><div class="cell-val" style="font-size:10px;">${cid}</div></div>
+  <div class="cell"><span class="cell-lbl">10- Diagnóstico</span><div class="cell-val">${diag}</div></div>
+</div>
+
+<!-- CAMPO 11: Anamnese -->
+<div class="cell" style="min-height:45px;margin-bottom:1px;">
+  <span class="cell-lbl">11- Anamnese *</span>
+  <div style="font-size:7.5px;white-space:pre-wrap;">${anamnese}</div>
+</div>
+
+<!-- CAMPO 12: Tratamento prévio -->
+<div class="cell" style="margin-bottom:1px;">
+  <span class="cell-lbl">12- Paciente realizou tratamento prévio ou está em tratamento da doença? *</span>
+  <div class="radio-group" style="margin-top:2px;">
+    <div class="radio-opt"><div class="rb ${tratPrev==='NAO'?'on':''}"></div> NÃO</div>
+    <div class="radio-opt"><div class="rb ${tratPrev!=='NAO'?'on':''}"></div> SIM. Relatar:</div>
+    <div style="flex:1;font-size:7.5px;white-space:pre-wrap;">${tratPrevTxt}</div>
+  </div>
+</div>
+
+<!-- CAMPO 13: Atestado de capacidade -->
+<div class="cell" style="margin-bottom:1px;">
+  <span class="cell-lbl">13- Atestado de capacidade *</span>
+  <div style="font-size:7px;margin-bottom:2px;">A solicitação do medicamento deverá ser realizada pelo paciente. O paciente é considerado incapaz?</div>
+  <div class="radio-group">
+    <div class="radio-opt"><div class="rb ${incapaz==='NAO'?'on':''}"></div> NÃO</div>
+    <div class="radio-opt"><div class="rb ${incapaz!=='NAO'?'on':''}"></div> SIM. Nome do responsável: <span style="margin-left:4px;font-weight:600;">${responsavel}</span></div>
+  </div>
+</div>
+
+<!-- CAMPOS 14-16: Médico, CNS, Data -->
+<div class="grid row3">
+  <div class="cell"><span class="cell-lbl">14- Nome do médico solicitante *</span><div class="cell-val">${medico}</div></div>
+  <div class="cell"><span class="cell-lbl">15- CNS do médico solicitante</span><div class="cell-val">${cnsMedico}</div></div>
+  <div class="cell"><span class="cell-lbl">16- Data da solicitação *</span><div class="cell-val">${hoje}</div></div>
+</div>
+
+<!-- CAMPO 17: Assinatura -->
+<div class="cell" style="min-height:22px;margin-bottom:1px;">
+  <span class="cell-lbl">17- Assinatura e carimbo do médico *</span>
+</div>
+
+<!-- CAMPOS 18-22: Responsável pelo preenchimento -->
+<div class="sec">Campos abaixo preenchidos por *:</div>
+<div class="cell" style="margin-bottom:1px;">
+  <div class="radio-group" style="margin:2px 0;">
+    <div class="radio-opt"><div class="cb"></div> Paciente</div>
+    <div class="radio-opt"><div class="cb"></div> Mãe do paciente</div>
+    <div class="radio-opt"><div class="cb"></div> Responsável (descrito no item 13)</div>
+    <div class="radio-opt"><div class="cb on"></div> Médico solicitante</div>
+    <div style="font-size:7px;">Outro, informar nome: _____________ e CPF: _____________</div>
+  </div>
+</div>
+
+<div class="grid row3">
+  <div class="cell">
+    <span class="cell-lbl">19- Raça/Cor/Etnia *</span>
+    <div class="radio-group">
+      <div class="radio-opt"><div class="cb"></div> Branca</div>
+      <div class="radio-opt"><div class="cb"></div> Preta</div>
+      <div class="radio-opt"><div class="cb"></div> Parda</div>
+      <div class="radio-opt"><div class="cb"></div> Amarela</div>
+    </div>
+    <div style="margin-top:1px;font-size:7px;">Indígena. Etnia: _______________</div>
+  </div>
+  <div class="cell"><span class="cell-lbl">20- Telefone(s) para contato do paciente</span><div style="font-size:7.5px;margin-top:2px;">&nbsp;</div></div>
+  <div class="cell"><span class="cell-lbl">22- Correio eletrônico do paciente</span><div style="font-size:7.5px;margin-top:2px;">&nbsp;</div></div>
+</div>
+
+<div class="grid row-cid">
+  <div class="cell">
+    <span class="cell-lbl">21- Número do documento do paciente *</span>
+    <div class="radio-group" style="margin-top:2px;">
+      <div class="radio-opt"><div class="cb"></div> CPF</div>
+      <div class="radio-opt"><div class="cb"></div> CNS</div>
+      <div style="font-size:7px;">Número: ___________________</div>
+    </div>
+  </div>
+  <div class="cell"><span class="cell-lbl">23- Assinatura do responsável pelo preenchimento *</span><div style="min-height:14px;"></div></div>
+</div>
+
+<div style="font-size:6.5px;text-align:center;color:#c00;margin-top:2px;">* CAMPOS DE PREENCHIMENTO OBRIGATÓRIO &nbsp;&nbsp; Para suporte, entre em contato pelo: ceaf.daf@saude.gov.br</div>
+
+<!-- DOCUMENTOS OBRIGATÓRIOS -->
+<div class="docs-box">
+  <div class="docs-title">📋 DOCUMENTOS OBRIGATÓRIOS A ANEXAR (conforme PCDT)</div>
+  <div style="font-size:7px;">${d.documentos ? d.documentos.split(';').filter(x=>x.trim()).map(doc=>'• '+doc.trim()).join('<br>') : '• laudo médico com CID-10<br>• exames complementares<br>• cartão SUS<br>• RG/CPF<br>• prescrição médica'}</div>
+</div>
+
+<!-- CRITÉRIOS -->
+<div class="crit-box">
+  <div class="crit-title">✓ CRITÉRIOS DO PCDT ATENDIDOS PELO PACIENTE</div>
+  <div style="font-size:7px;">${d.observacoes||''}</div>
+</div>
+
+<div class="rascunho">RASCUNHO ProtocoloBrasil — Gerado em ${hoje} — Campos em amarelo devem ser preenchidos pelo médico. Verifique todos os dados antes de assinar e entregar ao paciente.</div>
+
+</div>
+</body></html>`;
+
+  pm.querySelector('iframe').srcdoc = html;
+}
 
 function askCriteria() {
   document.getElementById('cin').value = `Detalhe os critérios específicos de cada medicamento disponível no SUS para esta condição — para qual perfil de paciente cada um está indicado, contraindicações específicas e exames necessários antes de iniciar cada um.`;
