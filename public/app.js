@@ -1126,6 +1126,13 @@ textarea.cell-input{resize:none;min-height:30px;display:block;overflow:hidden;}
   pm.querySelector('iframe').srcdoc = html;
 }
 
+function sendFollowupQ(btn) {
+  const q = btn.getAttribute('data-query');
+  if (!q) return;
+  document.getElementById('cin').value = q;
+  send();
+}
+
 function askCriteria() {
   document.getElementById('cin').value = `Detalhe os critérios específicos de cada medicamento disponível no SUS para esta condição — para qual perfil de paciente cada um está indicado, contraindicações específicas e exames necessários antes de iniciar cada um.`;
   send();
@@ -1391,6 +1398,12 @@ ${proto.protocolos_extras ? '- Particularidades estaduais:\n  • ' + proto.prot
 - ⚠️ DISPONIBILIDADE ESTADUAL: O CEAF é descentralizado — cada estado define seus medicamentos disponíveis. SEMPRE oriente o médico a confirmar disponibilidade na SES-${uf} antes de solicitar, especialmente para biológicos de alta complexidade recém-incorporados. Em caso de indisponibilidade: orientar abertura de processo administrativo na SES ou acionamento da Defensoria Pública.` : '';
 
   const fn = Object.entries(filters).filter(([, fv]) => !fv).map(([k]) => k);
+  // Detect if this is a follow-up question (conversation already has turns)
+  const isFollowUp = conv.filter(m => m.role === 'assistant').length > 0;
+  const followUpRule = isFollowUp
+    ? `\nREGRA ANTI-REPETIÇÃO: Esta é uma pergunta de acompanhamento. NÃO repita informações já fornecidas na conversa anterior. Seja DIRETO — responda APENAS o que foi perguntado agora, acrescentando somente informações novas.`
+    : '';
+
   return `Você é o ProtocoloBrasil. Assistente clínico para médicos brasileiros.
 
 REGRA CRÍTICA — LEIA ANTES DE RESPONDER:
@@ -1422,7 +1435,22 @@ CID: [código] | Medicamento: [nome exato da BASE]
 Documentos obrigatórios: [lista]
 
 📄 [Portaria da BASE] [BR]
-⚠️ Apoio à decisão — consulte gov.br/saude/pcdt${fn.length ? `\nFILTROS: NÃO usar ${fn.join(', ')}.` : ''}${estadoCtx}${ctx ? '\n\n════ BASE DE PCDTs — USE EXCLUSIVAMENTE ESTES DADOS ════\n' + ctx : ''}`;
+⚠️ Apoio à decisão — consulte gov.br/saude/pcdt${fn.length ? `\nFILTROS: NÃO usar ${fn.join(', ')}.` : ''}${followUpRule}${estadoCtx}${ctx ? '\n\n════ BASE DE PCDTs — USE EXCLUSIVAMENTE ESTES DADOS ════\n' + ctx : ''}
+
+AO FINAL DE TODA RESPOSTA — OBRIGATÓRIO:
+Inclua EXATAMENTE este bloco (não modifique o formato):
+<followup>
+P1: [pergunta curta e específica sobre o caso clínico — ex: "Deseja calcular a dose pelo peso do paciente?"]
+P2: [segunda pergunta relevante — ex: "Quer saber os principais efeitos colaterais desta medicação?"]
+P3: [terceira pergunta opcional e específica — ex: "Gostaria de saber os critérios de suspensão do tratamento?"]
+</followup>
+
+REGRAS para as perguntas de follow-up:
+- Sejam ESPECÍFICAS para o caso discutido, nunca genéricas
+- NUNCA sugira "preencher o LME" para doenças do Componente ESTRATÉGICO: tuberculose, HIV/AIDS, hepatite B, hepatite C, leishmaniose, doença de Chagas, malária, hanseníase, esquistossomose e outros do CESAF — esses medicamentos são dispensados diretamente pela rede sem LME
+- Para doenças do CEAF (biológicos, reumatologia, neurologia, etc.): pode sugerir LME
+- Use 2 perguntas se o caso for simples, 3 se for complexo
+- Exemplos válidos: calcular dose por peso, efeitos colaterais, critérios de troca, monitorização, exames de acompanhamento, conduta em falha terapêutica, interações medicamentosas`;
 }
 
 async function send() {
@@ -1460,11 +1488,38 @@ async function send() {
       function finalizeStream() {
         if (streamDone) return;
         streamDone = true;
-        const isPCDT = /crit[eé]rios|LME|componente|CEAF|portaria|medicamento|SUS/i.test(fullAns);
-        const btns = isPCDT
+
+        // Extract <followup> block from AI response
+        let mainAns = fullAns;
+        let followupBtns = '';
+        const fuMatch = fullAns.match(/<followup>([\s\S]*?)<\/followup>/i);
+
+        if (fuMatch) {
+          mainAns = fullAns.replace(/<followup>[\s\S]*?<\/followup>/i, '').trim();
+          const questions = fuMatch[1].trim().split('\n')
+            .map(l => l.replace(/^P\d+:\s*/i, '').trim())
+            .filter(q => q.length > 3);
+          if (questions.length) {
+            const qBtns = questions.map(q =>
+              `<button class="followup-btn fu-q" onclick="sendFollowupQ(this)" data-query="${q.replace(/"/g,'&quot;')}">${q}</button>`
+            ).join('');
+            followupBtns = `<div class="followup-bar fu-questions">${qBtns}</div>`;
+          }
+        }
+
+        // Always add action buttons below
+        // Componente Estratégico — não usa LME
+        const isEstrategico = /\btuberculose\b|\btb\b|\bhiv\b|\baids\b|\bhepatite\s*[bc]\b|\bleishmaniose\b|\bhanseníase\b|\bhansenÃ­ase\b|\bmalária\b|\besquistossomose\b|\bdoença de chagas\b|\bRIPE\b|\bTARV\b|\bisoniazida\b|\brifampicina\b|\btenofovir\b|\bdolutegravir\b|\bsofosbuvir\b|\banfotericina\b|\bantimoniato\b/i.test(mainAns);
+        const isPCDT = !isEstrategico && /crit[eé]rios|LME|componente|CEAF|portaria|medicamento|SUS|tratamento|dose|paciente/i.test(mainAns);
+        const actionBtns = isEstrategico
+          ? `<div class="followup-bar"><button class="followup-btn" onclick="askCriteria()">🔍 Critérios do protocolo</button><button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button><button class="followup-btn" onclick="askFollowup()">💬 Aprofundar tema</button></div>`
+          : isPCDT
           ? `<div class="followup-bar"><button class="followup-btn" onclick="askLME()">📝 Gerar rascunho do LME</button><button class="followup-btn" onclick="askCriteria()">🔍 Critérios por medicamento</button><button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button></div>`
           : `<div class="followup-bar"><button class="followup-btn" onclick="askFollowup()">💬 Aprofundar tema</button><button class="followup-btn" onclick="askAlternative()">🔄 Protocolo completo MS</button></div>`;
-        bub.innerHTML = mdR(fullAns) + btns;
+
+        bub.innerHTML = mdR(mainAns) + followupBtns + actionBtns;
+        // Save clean answer (without followup block) to conv
+        conv[conv.length - 1] = { role: 'assistant', content: mainAns };
         cm.scrollTop = cm.scrollHeight;
         busy = false;
         document.getElementById('sbtn').disabled = false;
