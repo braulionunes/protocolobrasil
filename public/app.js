@@ -155,7 +155,7 @@ function renderH(arr) {
         <button class="del-btn" onclick="event.stopPropagation();delSess(${i})" title="Excluir consulta">×</button>
       </div>
       <div class="hi-m">${h.data} · ${h.uf}</div>
-      <span class="hi-tag t${h.tipo || 'p'}">${{ k: 'PCDT', i: 'Intl', r: 'Raro', p: 'Protocolo' }[h.tipo || 'p']}</span>
+      <span class="hi-tag t${h.tipo || 'p'}">${{ k: 'PCDT', i: 'Intl', r: 'Raro', e: 'Estratégico', p: 'Protocolo' }[h.tipo || 'p'] || 'Protocolo'}</span>
     </div>`).join('');
 }
 
@@ -1159,8 +1159,12 @@ function hideTyp() { document.getElementById('typ')?.remove(); }
 
 function classQ(q) {
   const ql = q.toLowerCase();
-  if (/raro|fabry|gaucher|pompe|wilson|mps|ame |atrofia muscular|amiloidose/.test(ql)) return 'r';
-  if (/pcdt|sus|ceaf|componente|critério|alto custo|dispensação/.test(ql)) return 'k';
+  // Doenças raras — classificação específica
+  if (/\braro\b|fabry|gaucher|pompe|wilson|\bmps\b|\bame\b|atrofia muscular espinhal|amiloidose|mucopolissacaridose|lipofuscinose|hipoparatireoidismo|angioedema hereditário/.test(ql)) return 'r';
+  // Componente Estratégico — infectologia
+  if (/\btuberculose\b|\btb\b|\bhiv\b|\baids\b|hepatite [bc]|leishmaniose|hanseníase|malária|esquistossomose|chagas|\biltb\b|\bripe\b|\btarv\b/.test(ql)) return 'e';
+  // PCDT/CEAF
+  if (/pcdt|sus|ceaf|componente|critério|alto custo|dispensação|lme|portaria/.test(ql)) return 'k';
   return 'p';
 }
 
