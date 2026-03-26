@@ -294,24 +294,40 @@ function addU(txt, sc = true) {
   r.innerHTML = `<div class="m-av u">${ini}</div><div class="m-bub">${esc(txt)}</div>`;
   cm.appendChild(r); if (sc) cm.scrollTop = cm.scrollHeight;
 }
+function parseFollowup(rawTxt) {
+  // Strip <followup> block, extract questions, return {clean, questions}
+  const match = rawTxt.match(/<followup>([\s\S]*?)<\/followup>/i);
+  const clean = rawTxt.replace(/<followup>[\s\S]*?<\/followup>/gi, '').trim();
+  const questions = match
+    ? match[1].trim().split('\n').map(l => l.replace(/^P\d+:\s*/i,'').trim()).filter(q => q.length > 4)
+    : [];
+  return { clean, questions };
+}
+
+function buildActionBtns(txt) {
+  const isEstrategico = /\btuberculose\b|\btb\b|\bhiv\b|\baids\b|hepatite [bc]|leishmaniose|hanseníase|malária|esquistossomose|chagas|\bripe\b|\btarv\b|isoniazida|rifampicina|tenofovir|sofosbuvir|anfotericina/i.test(txt);
+  if (isEstrategico)
+    return `<div class="followup-bar"><button class="followup-btn" onclick="askCriteria()">🔍 Critérios do protocolo</button><button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button><button class="followup-btn" onclick="askFollowup()">💬 Aprofundar tema</button></div>`;
+  const isPCDT = /crit[eé]rios|lme|ceaf|portaria|medicamento|sus|tratamento|dose|paciente/i.test(txt);
+  if (isPCDT)
+    return `<div class="followup-bar"><button class="followup-btn" onclick="askLME()">📝 Gerar rascunho do LME</button><button class="followup-btn" onclick="askCriteria()">🔍 Critérios por medicamento</button><button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button></div>`;
+  return `<div class="followup-bar"><button class="followup-btn" onclick="askFollowup()">💬 Aprofundar tema</button><button class="followup-btn" onclick="askAlternative()">🔄 Protocolo completo MS</button></div>`;
+}
+
 function addAI(txt, sc = true) {
+  const { clean, questions } = parseFollowup(txt);
   const cm = document.getElementById('msgs');
   const r  = document.createElement('div'); r.className = 'm-row ai';
 
-  // Detecta se a resposta envolve PCDT/alto custo para oferecer LME
-  const isPCDT = /crit[eé]rios|LME|componente|CEAF|portaria|medicamento|SUS|dispensação/i.test(txt);
-  const lmeBtn = isPCDT ? `
-    <div class="followup-bar">
-      <button class="followup-btn" onclick="askLME()">📝 Gerar rascunho do LME</button>
-      <button class="followup-btn" onclick="askCriteria()">🔍 Detalhar critérios por medicamento</button>
-      <button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button>
-    </div>` : `
-    <div class="followup-bar">
-      <button class="followup-btn" onclick="askFollowup()">💬 Aprofundar esse tema</button>
-      <button class="followup-btn" onclick="askAlternative()">🔄 Ver protocolo completo</button>
-    </div>`;
+  let fuBtns = '';
+  if (questions.length) {
+    const qBtns = questions.map(q =>
+      `<button class="followup-btn fu-q" onclick="sendFollowupQ(this)" data-query="${q.replace(/"/g,'&quot;')}">${q}</button>`
+    ).join('');
+    fuBtns = `<div class="followup-bar fu-questions">${qBtns}</div>`;
+  }
 
-  r.innerHTML = `<div class="m-av ai">🩺</div><div class="m-bub">${mdR(txt)}${lmeBtn}</div>`;
+  r.innerHTML = `<div class="m-av ai">🩺</div><div class="m-bub">${mdR(clean)}${fuBtns}${buildActionBtns(clean)}</div>`;
   cm.appendChild(r); if (sc) cm.scrollTop = cm.scrollHeight;
 }
 
@@ -1493,36 +1509,17 @@ async function send() {
         if (streamDone) return;
         streamDone = true;
 
-        // Extract <followup> block from AI response
-        let mainAns = fullAns;
+        // Use shared helpers to parse followup and build buttons
+        const { clean: mainAns, questions: fuQs } = parseFollowup(fullAns);
         let followupBtns = '';
-        const fuMatch = fullAns.match(/<followup>([\s\S]*?)<\/followup>/i);
-
-        if (fuMatch) {
-          mainAns = fullAns.replace(/<followup>[\s\S]*?<\/followup>/i, '').trim();
-          const questions = fuMatch[1].trim().split('\n')
-            .map(l => l.replace(/^P\d+:\s*/i, '').trim())
-            .filter(q => q.length > 3);
-          if (questions.length) {
-            const qBtns = questions.map(q =>
-              `<button class="followup-btn fu-q" onclick="sendFollowupQ(this)" data-query="${q.replace(/"/g,'&quot;')}">${q}</button>`
-            ).join('');
-            followupBtns = `<div class="followup-bar fu-questions">${qBtns}</div>`;
-          }
+        if (fuQs.length) {
+          const qBtns = fuQs.map(q =>
+            `<button class="followup-btn fu-q" onclick="sendFollowupQ(this)" data-query="${q.replace(/"/g,'&quot;')}">${q}</button>`
+          ).join('');
+          followupBtns = `<div class="followup-bar fu-questions">${qBtns}</div>`;
         }
-
-        // Always add action buttons below
-        // Componente Estratégico — não usa LME
-        const isEstrategico = /\btuberculose\b|\btb\b|\bhiv\b|\baids\b|\bhepatite\s*[bc]\b|\bleishmaniose\b|\bhanseníase\b|\bhansenÃ­ase\b|\bmalária\b|\besquistossomose\b|\bdoença de chagas\b|\bRIPE\b|\bTARV\b|\bisoniazida\b|\brifampicina\b|\btenofovir\b|\bdolutegravir\b|\bsofosbuvir\b|\banfotericina\b|\bantimoniato\b/i.test(mainAns);
-        const isPCDT = !isEstrategico && /crit[eé]rios|LME|componente|CEAF|portaria|medicamento|SUS|tratamento|dose|paciente/i.test(mainAns);
-        const actionBtns = isEstrategico
-          ? `<div class="followup-bar"><button class="followup-btn" onclick="askCriteria()">🔍 Critérios do protocolo</button><button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button><button class="followup-btn" onclick="askFollowup()">💬 Aprofundar tema</button></div>`
-          : isPCDT
-          ? `<div class="followup-bar"><button class="followup-btn" onclick="askLME()">📝 Gerar rascunho do LME</button><button class="followup-btn" onclick="askCriteria()">🔍 Critérios por medicamento</button><button class="followup-btn" onclick="askDocs()">📋 Documentos necessários</button></div>`
-          : `<div class="followup-bar"><button class="followup-btn" onclick="askFollowup()">💬 Aprofundar tema</button><button class="followup-btn" onclick="askAlternative()">🔄 Protocolo completo MS</button></div>`;
-
-        bub.innerHTML = mdR(mainAns) + followupBtns + actionBtns;
-        // Save clean answer (without followup block) to conv
+        bub.innerHTML = mdR(mainAns) + followupBtns + buildActionBtns(mainAns);
+        // Save clean answer to conv (without followup block)
         conv[conv.length - 1] = { role: 'assistant', content: mainAns };
         cm.scrollTop = cm.scrollHeight;
         busy = false;
@@ -1543,7 +1540,10 @@ async function send() {
             }
             if (evt.text) {
               fullAns += evt.text;
-              bub.innerHTML = mdR(fullAns) + '<span class="stream-cursor">▌</span>';
+              // Strip <followup> tags from live preview during streaming
+              const preview = fullAns.replace(/<followup>[\s\S]*?<\/followup>/gi, '')
+                                     .replace(/<followup>[\s\S]*/gi, ''); // partial tag
+              bub.innerHTML = mdR(preview) + '<span class="stream-cursor">▌</span>';
               cm.scrollTop = cm.scrollHeight;
             }
             if (evt.done || evt.error) finalizeStream();
